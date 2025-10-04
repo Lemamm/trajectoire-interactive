@@ -1,4 +1,3 @@
-c'est bon j'ai retrouvé le code qui marché, je veux exactement celui la mais qui marche sur telephone :
 // src/App.jsx
 import React, { useEffect, useRef, useState } from "react";
 import TrajectoireInteractive from "./TrajectoireInteractive";

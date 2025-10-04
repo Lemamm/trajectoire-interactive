@@ -29,7 +29,7 @@ export default function App() {
       const eq = new Tone.EQ3(-4, 1, 3).connect(reverb);
 
       // Gain master pour gérer les transitions globales
-      const masterGain = new Tone.Gain(0.85).connect(eq);
+      const masterGain = new Tone.Gain(0.75).connect(eq);
 
       // Fade-in global doux (évite le pic au démarrage)
       try {

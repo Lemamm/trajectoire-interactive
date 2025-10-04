@@ -18,7 +18,8 @@ import {
   Moon,
   Sparkles,
   Shuffle,
-  Waves
+  Waves,
+  MessageCircle
 } from "lucide-react";
 
 /* ---------- POEMS (ton contenu existant) ---------- */
@@ -435,6 +436,14 @@ export default function TrajectoireInteractive() {
   const [showKeywords, setShowKeywords] = useState(false);
   const [readingMode, setReadingMode] = useState("linear"); // linear|semantic|poetic|visual|emotionalMap
   const [audioInitialized, setAudioInitialized] = useState(false);
+  
+  // NOUVEAU: état pour la pause en mode poétique
+  const [poeticPaused, setPoeticPaused] = useState(false);
+
+  // NOUVEAU: états pour les commentaires
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
 
   // selection used only by the emotional map bubble (keeps currentIndex for global)
   const [mapSelectedIndex, setMapSelectedIndex] = useState(null);
@@ -620,23 +629,46 @@ export default function TrajectoireInteractive() {
     })).filter(c => c.shared.length > 0 && c.idx !== currentIndex);
   };
 
-  /* ---------- POETIC AUTO-ADVANCE ---------- */
+  /* ---------- POETIC AUTO-ADVANCE AVEC PAUSE DE 7 SECONDES ---------- */
   useEffect(() => {
-    if (readingMode === "poetic") {
-      const timer = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % poems.length);
-        setIsReading(true);
-      }, 12000);
-      return () => clearInterval(timer);
+    if (readingMode === "poetic" && !poeticPaused) {
+      // Pause de 7 secondes après chaque poème avant de passer au suivant
+      const timer = setTimeout(() => {
+        setPoeticPaused(true);
+        setTimeout(() => {
+          setCurrentIndex((prev) => (prev + 1) % poems.length);
+          setIsReading(true);
+          setPoeticPaused(false);
+        }, 7000); // 7 secondes de pause
+      }, 12000); // Durée de lecture du poème
+      
+      return () => clearTimeout(timer);
     }
-  }, [readingMode]);
+  }, [readingMode, currentIndex, poeticPaused]);
 
-  /* ---------- EMOTIONAL MAP ROTATION (optional) ---------- */
-  // no state needed; animation handled by framer-motion
+  /* ---------- COMMENTAIRES ---------- */
+  const handleAddComment = () => {
+    if (newComment.trim()) {
+      setComments(prev => [...prev, {
+        id: Date.now(),
+        poemIndex: currentIndex,
+        poemTitle: currentPoem.title,
+        text: newComment,
+        timestamp: new Date().toLocaleString('fr-FR')
+      }]);
+      setNewComment("");
+    }
+  };
+
+  const deleteComment = (id) => {
+    setComments(prev => prev.filter(c => c.id !== id));
+  };
+
+  const currentPoemComments = comments.filter(c => c.poemIndex === currentIndex);
 
   /* ---------- RENDER ---------- */
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 space-y-8">
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 md:p-8 space-y-4 md:space-y-8">
       {/* Adaptive background color (behind everything) */}
       <motion.div
         className={`fixed inset-0 -z-10 bg-gradient-to-br ${currentPoem.color}`}
@@ -646,68 +678,84 @@ export default function TrajectoireInteractive() {
 
       <div className="max-w-6xl w-full">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl md:text-7xl font-serif mb-2 bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 bg-clip-text text-transparent animate-pulse">
+        <div className="text-center mb-4 md:mb-8">
+          <h1 className="text-4xl md:text-7xl font-serif mb-2 bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 bg-clip-text text-transparent animate-pulse">
             TRAJECTOIRE
           </h1>
-          <p className="text-gray-400 text-sm mb-1">Maxime Estrade</p>
-          <p className="text-purple-300 text-xs italic">Recueil interactif • Musique générative • Navigation sémantique</p>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <p className="text-gray-400 text-xs md:text-sm mb-1">Maxime Estrade</p>
+          <p className="text-purple-300 text-[10px] md:text-xs italic px-2">Recueil interactif • Musique générative • Navigation sémantique</p><div className="mt-4 md:mt-6 flex flex-wrap justify-center gap-2 md:gap-3">
             <button
               onClick={() => setShowPath(!showPath)}
-              className="px-4 py-2 bg-purple-600/30 hover:bg-purple-600/50 rounded-lg transition-all text-sm flex items-center gap-2 backdrop-blur"
+              className="px-3 md:px-4 py-2 bg-purple-600/30 hover:bg-purple-600/50 rounded-lg transition-all text-xs md:text-sm flex items-center gap-2 backdrop-blur"
             >
-              <Sparkles size={16} />
-              {showPath ? 'Cacher' : 'Voir'} la trajectoire
+              <Sparkles size={14} className="md:w-4 md:h-4" />
+              <span className="hidden sm:inline">{showPath ? 'Cacher' : 'Voir'} la trajectoire</span>
+              <span className="sm:hidden">{showPath ? 'Cacher' : 'Trajectoire'}</span>
             </button>
 
             <button
               onClick={toggleSound}
-              className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-2 backdrop-blur ${
+              className={`px-3 md:px-4 py-2 rounded-lg transition-all text-xs md:text-sm flex items-center gap-2 backdrop-blur ${
                 soundEnabled
                   ? 'bg-green-600/30 hover:bg-green-600/50 shadow-lg shadow-green-500/20'
                   : 'bg-gray-600/30 hover:bg-gray-600/50'
               }`}
             >
-              {soundEnabled ? <Volume2 size={16} className="animate-pulse" /> : <VolumeX size={16} />}
-              Musique générative {soundEnabled && '🎵'}
+              {soundEnabled ? <Volume2 size={14} className="md:w-4 md:h-4 animate-pulse" /> : <VolumeX size={14} className="md:w-4 md:h-4" />}
+              <span className="hidden sm:inline">Musique {soundEnabled && '🎵'}</span>
+              <span className="sm:hidden">{soundEnabled ? '🎵' : '🔇'}</span>
             </button>
 
             <button
               onClick={() => setReadingMode(readingMode === 'linear' ? 'semantic' : 'linear')}
-              className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-2 backdrop-blur ${
+              className={`px-3 md:px-4 py-2 rounded-lg transition-all text-xs md:text-sm flex items-center gap-2 backdrop-blur ${
                 readingMode === 'semantic'
                   ? 'bg-blue-600/30 hover:bg-blue-600/50 shadow-lg shadow-blue-500/20'
                   : 'bg-gray-600/30 hover:bg-gray-600/50'
               }`}
             >
-              <Shuffle size={16} />
-              {readingMode === 'linear' ? 'Lecture linéaire' : 'Navigation sémantique'}
+              <Shuffle size={14} className="md:w-4 md:h-4" />
+              <span className="hidden sm:inline">{readingMode === 'linear' ? 'Linéaire' : 'Sémantique'}</span>
+              <span className="sm:hidden">{readingMode === 'linear' ? '📖' : '🔀'}</span>
             </button>
 
             <button
               onClick={() => setShowKeywords(!showKeywords)}
-              className="px-4 py-2 bg-indigo-600/30 hover:bg-indigo-600/50 rounded-lg transition-all text-sm backdrop-blur"
+              className="px-3 md:px-4 py-2 bg-indigo-600/30 hover:bg-indigo-600/50 rounded-lg transition-all text-xs md:text-sm backdrop-blur"
             >
-              {showKeywords ? 'Cacher' : 'Voir'} les mots-clés
+              <span className="hidden sm:inline">{showKeywords ? 'Cacher' : 'Voir'} mots-clés</span>
+              <span className="sm:hidden">{showKeywords ? '🏷️' : '🔖'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowComments(!showComments)}
+              className="px-3 md:px-4 py-2 bg-pink-600/30 hover:bg-pink-600/50 rounded-lg transition-all text-xs md:text-sm backdrop-blur flex items-center gap-2"
+            >
+              <MessageCircle size={14} className="md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Commentaires</span>
+              {currentPoemComments.length > 0 && (
+                <span className="bg-pink-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                  {currentPoemComments.length}
+                </span>
+              )}
             </button>
           </div>
         </div>
 
         {/* Emotional Path Visualization */}
         {showPath && emotionalPath.length > 0 && (
-          <div className="mb-8 p-6 bg-black/40 rounded-xl backdrop-blur border border-purple-500/20">
+          <div className="mb-4 md:mb-8 p-4 md:p-6 bg-black/40 rounded-xl backdrop-blur border border-purple-500/20">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl text-purple-300 flex items-center gap-2">
-                <Waves size={20} />
-                Votre parcours émotionnel
+              <h3 className="text-base md:text-xl text-purple-300 flex items-center gap-2">
+                <Waves size={16} className="md:w-5 md:h-5" />
+                <span className="hidden sm:inline">Votre parcours émotionnel</span>
+                <span className="sm:inline md:hidden">Parcours</span>
               </h3>
-              <div className="text-sm text-gray-400">
-                {emotionalPath.length} poème{emotionalPath.length > 1 ? 's' : ''} exploré{emotionalPath.length > 1 ? 's' : ''}
+              <div className="text-xs md:text-sm text-gray-400">
+                {emotionalPath.length} poème{emotionalPath.length > 1 ? 's' : ''}
               </div>
             </div>
-            <div className="flex items-end gap-2 h-32 bg-black/20 rounded-lg p-2">
+            <div className="flex items-end gap-1 md:gap-2 h-24 md:h-32 bg-black/20 rounded-lg p-2">
               {emotionalPath.map((point, idx) => (
                 <div
                   key={idx}
@@ -715,17 +763,17 @@ export default function TrajectoireInteractive() {
                   style={{ height: `${point.intensity}%` }}
                   onClick={() => goToPoem(point.index)}
                 >
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/90 px-3 py-2 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-xl border border-purple-500/30">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/90 px-2 md:px-3 py-1 md:py-2 rounded-lg text-[10px] md:text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-xl border border-purple-500/30">
                     <div className="font-semibold">{poems[point.index].title}</div>
                     <div className="text-purple-300">{point.emotion}</div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-3 text-xs text-gray-400 text-center">
+            <div className="mt-2 md:mt-3 text-[10px] md:text-xs text-gray-400 text-center">
               {readingMode === 'semantic'
-                ? '🔀 Navigation par associations thématiques • Cliquez sur une barre pour revisiter'
-                : '📖 Lecture linéaire • Cliquez sur une barre pour revisiter ce poème'
+                ? '🔀 Navigation par associations thématiques'
+                : '📖 Cliquez sur une barre pour revisiter'
               }
             </div>
           </div>
@@ -733,20 +781,21 @@ export default function TrajectoireInteractive() {
 
         {/* Semantic Connections */}
         {readingMode === 'semantic' && getSemanticConnections().length > 0 && (
-          <div className="mb-6 p-5 bg-blue-900/20 rounded-xl backdrop-blur border border-blue-500/20">
-            <h4 className="text-sm text-blue-300 mb-3 flex items-center gap-2">
-              <Shuffle size={16} />
-              Connexions sémantiques depuis "{currentPoem.title}" :
+          <div className="mb-4 md:mb-6 p-3 md:p-5 bg-blue-900/20 rounded-xl backdrop-blur border border-blue-500/20">
+            <h4 className="text-xs md:text-sm text-blue-300 mb-2 md:mb-3 flex items-center gap-2">
+              <Shuffle size={14} className="md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Connexions sémantiques depuis "{currentPoem.title}"</span>
+              <span className="sm:inline md:hidden">Connexions</span>
             </h4>
             <div className="flex flex-wrap gap-2">
               {getSemanticConnections().map(conn => (
                 <button
                   key={conn.idx}
                   onClick={() => goToPoem(conn.idx)}
-                  className="px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 rounded-lg text-xs transition-all hover:scale-105 border border-blue-400/20"
+                  className="px-2 md:px-3 py-1 md:py-2 bg-blue-600/30 hover:bg-blue-600/50 rounded-lg text-[10px] md:text-xs transition-all hover:scale-105 border border-blue-400/20"
                 >
                   <div className="font-medium">{poems[conn.idx].title}</div>
-                  <div className="text-blue-200 text-[10px] mt-0.5">
+                  <div className="text-blue-200 text-[9px] md:text-[10px] mt-0.5">
                     via: {conn.shared.join(', ')}
                   </div>
                 </button>
@@ -756,9 +805,9 @@ export default function TrajectoireInteractive() {
         )}
 
         {/* Main Content Grid */}
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* Navigation Sidebar */}
-          <div className="md:col-span-1 space-y-2 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+          {/* Navigation Sidebar - Hidden on mobile in portrait */}
+          <div className="hidden md:block md:col-span-1 space-y-2 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
             {poems.map((poem, idx) => {
               const PoemIcon = poem.icon;
               const isRead = emotionalPath.some(p => p.index === idx);
@@ -793,28 +842,46 @@ export default function TrajectoireInteractive() {
           </div>
 
           {/* Poem Display */}
-          <div className="md:col-span-2">
-            <div className={`bg-gradient-to-br ${currentPoem.color} p-8 rounded-2xl shadow-2xl min-h-[70vh] flex flex-col justify-between relative overflow-hidden transition-all duration-500`}>
+          <div className="col-span-full md:col-span-2">
+            <div className={`bg-gradient-to-br ${currentPoem.color} p-4 md:p-8 rounded-2xl shadow-2xl min-h-[60vh] md:min-h-[70vh] flex flex-col justify-between relative overflow-hidden transition-all duration-500`}>
               {/* Animated Background Icon */}
               <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-0 right-0 w-96 h-96 animate-pulse">
-                  <Icon size={300} />
+                <div className="absolute top-0 right-0 w-48 h-48 md:w-96 md:h-96 animate-pulse">
+                  <Icon size={200} className="md:w-[300px] md:h-[300px]" />
                 </div>
               </div>
 
               {/* Sound Wave Visual */}
               {soundEnabled && (
-                <div className="absolute top-4 right-4 flex gap-1 items-end h-8">
+                <div className="absolute top-2 right-2 md:top-4 md:right-4 flex gap-1 items-end h-6 md:h-8">
                   {[...Array(8)].map((_, i) => (
                     <div
                       key={i}
-                      className="w-1 bg-white/60 rounded-full animate-wave"
+                      className="w-0.5 md:w-1 bg-white/60 rounded-full animate-wave"
                       style={{
                         animationDelay: `${i * 0.1}s`,
                         height: `${40 + (i % 4) * 10}%`
                       }}
                     />
                   ))}
+                </div>
+              )}
+
+              {/* Indicateur de pause en mode poétique */}
+              {readingMode === "poetic" && poeticPaused && (
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-xl px-6 py-4 rounded-2xl border border-white/20 z-30">
+                  <p className="text-white text-sm md:text-base text-center">
+                    ✨ Respiration poétique...
+                  </p>
+                  <div className="mt-2 flex justify-center gap-1">
+                    {[...Array(3)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 bg-white/60 rounded-full animate-pulse"
+                        style={{ animationDelay: `${i * 0.2}s` }}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -830,17 +897,17 @@ export default function TrajectoireInteractive() {
                   >
                     <motion.h2
                       key={currentPoem.title}
-                      className="text-3xl md:text-4xl font-serif"
+                      className="text-2xl md:text-4xl font-serif"
                       animate={{ scale: [0.98, 1.02, 0.98] }}
                       transition={{ duration: 4, repeat: Infinity }}
                     >
                       {currentPoem.title}
                     </motion.h2>
-                    <p className="text-sm opacity-90 italic mt-1">{currentPoem.emotion}</p>
+                    <p className="text-xs md:text-sm opacity-90 italic mt-1">{currentPoem.emotion}</p>
 
                     {/* Keywords toggle */}
                     {showKeywords && (
-                      <div className="mb-6 flex flex-wrap gap-2">
+                      <div className="mb-4 md:mb-6 flex flex-wrap gap-1.5 md:gap-2 mt-3">
                         {currentPoem.keywords.map((keyword, kidx) => (
                           <button
                             key={kidx}
@@ -848,7 +915,7 @@ export default function TrajectoireInteractive() {
                               const next = poems.findIndex(p => p.keywords.includes(keyword));
                               if (next !== -1) goToPoem(next);
                             }}
-                            className="px-3 py-1.5 bg-black/30 backdrop-blur rounded-full text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
+                            className="px-2 md:px-3 py-1 md:py-1.5 bg-black/30 backdrop-blur rounded-full text-[10px] md:text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
                           >
                             #{keyword}
                           </button>
@@ -856,9 +923,9 @@ export default function TrajectoireInteractive() {
                       </div>
                     )}
 
-                    {/* Reading mode content (wrap in a small container) */}
-                    <div className="prose prose-invert prose-lg max-w-none">
-                      <div className="text-lg md:text-xl leading-relaxed whitespace-pre-line font-serif backdrop-blur-sm bg-black/10 p-6 rounded-lg">
+                    {/* Reading mode content */}
+                    <div className="prose prose-invert prose-sm md:prose-lg max-w-none mt-4">
+                      <div className="text-sm md:text-xl leading-relaxed whitespace-pre-line font-serif backdrop-blur-sm bg-black/10 p-4 md:p-6 rounded-lg">
                         {/* readingMode specific render */}
                         {readingMode === "linear" && (
                           <div>{currentPoem.text}</div>
@@ -876,7 +943,7 @@ export default function TrajectoireInteractive() {
                                     setIsReading(true);
                                   }
                                 }}
-                                className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full text-white cursor-pointer hover:scale-110 transition-transform"
+                                className="px-2 md:px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full text-white cursor-pointer hover:scale-110 transition-transform text-xs md:text-sm"
                                 whileHover={{ scale: 1.1 }}
                               >
                                 {word}
@@ -897,14 +964,13 @@ export default function TrajectoireInteractive() {
 
                         {readingMode === "visual" && (
                           <motion.div className="relative w-full flex flex-col items-center" animate={{ rotate: [0, 360] }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }}>
-                            <Icon size={80} className="mb-6 text-white opacity-90" />
-                            <div className={`w-64 h-64 rounded-full bg-gradient-to-br ${currentPoem.color} blur-3xl opacity-70`} />
+                            <Icon size={60} className="md:w-20 md:h-20 mb-4 md:mb-6 text-white opacity-90" />
+                            <div className={`w-48 h-48 md:w-64 md:h-64 rounded-full bg-gradient-to-br ${currentPoem.color} blur-3xl opacity-70`} />
                           </motion.div>
                         )}
 
                         {readingMode === "emotionalMap" && (
-                          // placeholder text instructing the user — actual map is rendered below (outside this card)
-                          <div className="text-center text-sm text-gray-200">
+                          <div className="text-center text-xs md:text-sm text-gray-200">
                             🌌 Ouvre la carte émotionnelle en bas pour explorer la constellation.
                           </div>
                         )}
@@ -915,31 +981,30 @@ export default function TrajectoireInteractive() {
               </div>
 
               {/* Navigation Controls */}
-              <div className="flex justify-between items-center mt-8 relative z-10">
+              <div className="flex flex-col md:flex-row justify-between items-center mt-4 md:mt-8 relative z-10 gap-3 md:gap-0">
                 <button
                   onClick={prevPoem}
                   disabled={readingMode === 'semantic' ? (emotionalPath.length <= 1) : false}
-                  className="px-6 py-3 bg-black/40 hover:bg-black/60 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur font-medium border border-white/10"
+                  className="w-full md:w-auto px-4 md:px-6 py-2 md:py-3 bg-black/40 hover:bg-black/60 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur font-medium border border-white/10 text-xs md:text-base"
                 >
                   ← {readingMode === 'semantic' ? 'Retour' : 'Précédent'}
                 </button>
 
-                <div className="text-center">
-                  <div className="text-sm opacity-90 font-medium">
-                    {readingMode === 'semantic'
-                      ? `${emotionalPath.length} / ${poems.length} explorés`
-                      : `${currentIndex + 1} / ${poems.length}`
-                    }
+                <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-center">
+                  <div className="text-center">
+                    <div className="text-xs md:text-sm opacity-90 font-medium">
+                      {readingMode === 'semantic'
+                        ? `${emotionalPath.length} / ${poems.length} explorés`
+                        : `${currentIndex + 1} / ${poems.length}`
+                      }
+                    </div>
+                    {readingMode === 'semantic' && emotionalPath.length === poems.length && (
+                      <div className="text-[10px] md:text-xs text-yellow-300 mt-1">✨ Recueil terminé !</div>
+                    )}
                   </div>
-                  {readingMode === 'semantic' && emotionalPath.length === poems.length && (
-                    <div className="text-xs text-yellow-300 mt-1">✨ Recueil terminé !</div>
-                  )}
-                </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="text-xs text-gray-300 mr-2 hidden md:block">Modes</div>
                   {/* Mode selector quick */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-1 md:gap-2">
                     {[
                       { id: "linear", label: "📖" },
                       { id: "semantic", label: "🔀" },
@@ -950,34 +1015,34 @@ export default function TrajectoireInteractive() {
                       <button
                         key={m.id}
                         onClick={() => setReadingMode(m.id)}
-                        className={`px-3 py-2 rounded-lg transition-all ${readingMode === m.id ? 'bg-white/20' : 'bg-black/20'}`}
+                        className={`px-2 md:px-3 py-1.5 md:py-2 rounded-lg transition-all text-sm md:text-base ${readingMode === m.id ? 'bg-white/20' : 'bg-black/20'}`}
                         title={m.id}
                       >
                         {m.label}
                       </button>
                     ))}
                   </div>
-
-                  <button
-                    onClick={nextPoem}
-                    disabled={
-                      (readingMode === 'linear' && currentIndex === poems.length - 1) ||
-                      (readingMode === 'semantic' && emotionalPath.length === poems.length)
-                    }
-                    className="px-6 py-3 bg-black/40 hover:bg-black/60 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur font-medium border border-white/10 ml-3"
-                  >
-                    {readingMode === 'semantic' ? 'Explorer' : 'Suivant'} →
-                  </button>
                 </div>
+
+                <button
+                  onClick={nextPoem}
+                  disabled={
+                    (readingMode === 'linear' && currentIndex === poems.length - 1) ||
+                    (readingMode === 'semantic' && emotionalPath.length === poems.length)
+                  }
+                  className="w-full md:w-auto px-4 md:px-6 py-2 md:py-3 bg-black/40 hover:bg-black/60 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur font-medium border border-white/10 text-xs md:text-base"
+                >
+                  {readingMode === 'semantic' ? 'Explorer' : 'Suivant'} →
+                </button>
               </div>
 
               {/* Intensity meter */}
-              <div className="mt-4 relative z-10">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-xs opacity-70 font-medium">Intensité émotionnelle</div>
-                  <div className="text-xs opacity-70 font-mono">{currentPoem.intensity}%</div>
+              <div className="mt-3 md:mt-4 relative z-10">
+                <div className="flex justify-between items-center mb-1 md:mb-2">
+                  <div className="text-[10px] md:text-xs opacity-70 font-medium">Intensité émotionnelle</div>
+                  <div className="text-[10px] md:text-xs opacity-70 font-mono">{currentPoem.intensity}%</div>
                 </div>
-                <div className="w-full h-3 bg-black/40 rounded-full overflow-hidden backdrop-blur border border-white/10">
+                <div className="w-full h-2 md:h-3 bg-black/40 rounded-full overflow-hidden backdrop-blur border border-white/10">
                   <div
                     className="h-full bg-gradient-to-r from-white/60 to-white/90 transition-all duration-700 rounded-full shadow-lg"
                     style={{ width: `${currentPoem.intensity}%` }}
@@ -986,11 +1051,66 @@ export default function TrajectoireInteractive() {
               </div>
             </div>
 
+            {/* NOUVEAU: Section Commentaires */}
+            {showComments && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 md:mt-6 p-4 md:p-6 bg-black/40 rounded-xl backdrop-blur border border-pink-500/20"
+              >
+                <h3 className="text-base md:text-lg text-pink-300 mb-3 md:mb-4 flex items-center gap-2">
+                  <MessageCircle size={18} className="md:w-5 md:h-5" />
+                  Commentaires sur "{currentPoem.title}"
+                </h3>
+
+                {/* Liste des commentaires */}
+                <div className="space-y-2 md:space-y-3 mb-4 max-h-48 md:max-h-64 overflow-y-auto custom-scrollbar">
+                  {currentPoemComments.length === 0 ? (
+                    <p className="text-xs md:text-sm text-gray-400 italic">Aucun commentaire pour ce poème. Soyez le premier à partager votre ressenti !</p>
+                  ) : (
+                    currentPoemComments.map(comment => (
+                      <div key={comment.id} className="bg-black/30 p-3 md:p-4 rounded-lg border border-pink-500/10">
+                        <p className="text-xs md:text-sm text-gray-200">{comment.text}</p>
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="text-[10px] md:text-xs text-gray-500">{comment.timestamp}</span>
+                          <button
+                            onClick={() => deleteComment(comment.id)}
+                            className="text-[10px] md:text-xs text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Formulaire nouveau commentaire */}
+                <div className="flex flex-col md:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                    placeholder="Partagez votre ressenti sur ce poème..."
+                    className="flex-1 px-3 md:px-4 py-2 bg-black/50 border border-pink-500/30 rounded-lg text-white placeholder-gray-500 text-xs md:text-sm focus:outline-none focus:border-pink-500/60 transition-colors"
+                  />
+                  <button
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim()}
+                    className="px-4 md:px-6 py-2 bg-pink-600/30 hover:bg-pink-600/50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-all text-xs md:text-sm font-medium border border-pink-500/20"
+                  >
+                    Publier
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* If emotionalMap mode is active, render the map below the card */}
             {readingMode === "emotionalMap" && (
-              <div className="mt-6 flex justify-center">
+              <div className="mt-4 md:mt-6 flex justify-center">
                 <motion.div
-                  className="relative w-full max-w-2xl h-[520px] bg-gradient-to-b from-black to-gray-900 rounded-3xl overflow-hidden border border-gray-700 shadow-xl"
+                  className="relative w-full max-w-2xl h-[400px] md:h-[520px] bg-gradient-to-b from-black to-gray-900 rounded-3xl overflow-hidden border border-gray-700 shadow-xl"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.9 }}
@@ -1012,9 +1132,9 @@ export default function TrajectoireInteractive() {
                         if (intensityDiff < 25) {
                           const angleA = (i / poems.length) * 2 * Math.PI;
                           const angleB = (j / poems.length) * 2 * Math.PI;
-                          const radius = 180;
-                          const centerX = 360 / 2 + 40; // approx center inside container
-                          const centerY = 520 / 2;
+                          const radius = window.innerWidth < 768 ? 120 : 180;
+                          const centerX = window.innerWidth < 768 ? 200 : 360 / 2 + 40;
+                          const centerY = window.innerWidth < 768 ? 200 : 520 / 2;
                           const x1 = centerX + radius * Math.cos(angleA);
                           const y1 = centerY + radius * Math.sin(angleA);
                           const x2 = centerX + radius * Math.cos(angleB);
@@ -1040,9 +1160,9 @@ export default function TrajectoireInteractive() {
                   <div className="absolute inset-0 flex items-center justify-center">
                     {poems.map((poem, i) => {
                       const angle = (i / poems.length) * 2 * Math.PI;
-                      const radius = 180;
-                      const centerX = 360 / 2 + 40;
-                      const centerY = 520 / 2;
+                      const radius = window.innerWidth < 768 ? 120 : 180;
+                      const centerX = window.innerWidth < 768 ? 200 : 360 / 2 + 40;
+                      const centerY = window.innerWidth < 768 ? 200 : 520 / 2;
                       const x = centerX + radius * Math.cos(angle);
                       const y = centerY + radius * Math.sin(angle);
 
@@ -1064,12 +1184,12 @@ export default function TrajectoireInteractive() {
                           transition={{ type: "spring", stiffness: 200 }}
                         >
                           <div
-                            className={`w-6 h-6 rounded-full bg-gradient-to-br ${poem.color} shadow-lg ${mapSelectedIndex === i ? "ring-4 ring-white/80" : ""}`}
+                            className={`w-5 h-5 md:w-6 md:h-6 rounded-full bg-gradient-to-br ${poem.color} shadow-lg ${mapSelectedIndex === i ? "ring-2 md:ring-4 ring-white/80" : ""}`}
                             title={`${poem.title} (${poem.emotion})`}
                           />
                           {mapSelectedIndex === i && (
                             <motion.div
-                              className="absolute -top-10 bg-gray-800 text-xs text-white px-3 py-1 rounded-full whitespace-nowrap"
+                              className="absolute -top-8 md:-top-10 bg-gray-800 text-[10px] md:text-xs text-white px-2 md:px-3 py-1 rounded-full whitespace-nowrap"
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ duration: 0.4 }}
@@ -1085,23 +1205,24 @@ export default function TrajectoireInteractive() {
                   {/* bubble for selected */}
                   {mapSelectedIndex !== null && (
                     <motion.div
-                      className="absolute inset-0 flex items-center justify-center"
+                      className="absolute inset-0 flex items-center justify-center p-4"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.4 }}
                     >
-                      <div className="bg-black/85 backdrop-blur-xl border border-gray-700 p-6 rounded-3xl max-w-lg text-center text-white shadow-2xl">
-                        <h3 className="text-lg font-semibold mb-2">{poems[mapSelectedIndex].title}</h3>
-                        <p className="text-sm opacity-80 mb-3">{poems[mapSelectedIndex].emotion}</p>
-                        <div className="text-gray-300 leading-relaxed text-sm whitespace-pre-line max-h-48 overflow-auto p-2">
+                      <div className="bg-black/85 backdrop-blur-xl border border-gray-700 p-4 md:p-6 rounded-3xl max-w-sm md:max-w-lg text-center text-white shadow-2xl">
+                        <h3 className="text-base md:text-lg font-semibold mb-2">
+                        {poems[mapSelectedIndex].title}</h3>
+                        <p className="text-xs md:text-sm opacity-80 mb-3">{poems[mapSelectedIndex].emotion}</p>
+                        <div className="text-gray-300 leading-relaxed text-xs md:text-sm whitespace-pre-line max-h-32 md:max-h-48 overflow-auto p-2 custom-scrollbar">
                           {poems[mapSelectedIndex].text}
                         </div>
-                        <div className="flex justify-center gap-3 mt-4">
+                        <div className="flex justify-center gap-2 md:gap-3 mt-4">
                           <button
                             onClick={() => {
                               setMapSelectedIndex(null);
                             }}
-                            className="px-4 py-1 bg-gray-800 hover:bg-gray-700 rounded-full text-xs text-gray-200"
+                            className="px-3 md:px-4 py-1 bg-gray-800 hover:bg-gray-700 rounded-full text-xs text-gray-200"
                           >
                             Fermer
                           </button>
@@ -1110,7 +1231,7 @@ export default function TrajectoireInteractive() {
                               setMapSelectedIndex(null);
                               setReadingMode('poetic');
                             }}
-                            className="px-4 py-1 bg-purple-600 hover:bg-purple-500 rounded-full text-xs text-white"
+                            className="px-3 md:px-4 py-1 bg-purple-600 hover:bg-purple-500 rounded-full text-xs text-white"
                           >
                             Lire en poétique
                           </button>
@@ -1119,7 +1240,7 @@ export default function TrajectoireInteractive() {
                     </motion.div>
                   )}
 
-                  <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 text-gray-400 text-sm">
+                  <div className="absolute bottom-2 md:bottom-3 left-1/2 transform -translate-x-1/2 text-gray-400 text-[10px] md:text-sm">
                     Cliquer sur un point pour lire le poème
                   </div>
                 </motion.div>
@@ -1128,26 +1249,61 @@ export default function TrajectoireInteractive() {
           </div>
         </div>
 
+        {/* Mobile Navigation Bar - Visible only on mobile */}
+        <div className="md:hidden mt-4 bg-black/40 backdrop-blur rounded-xl p-3 border border-purple-500/20">
+          <div className="text-xs text-purple-300 mb-2 text-center">Navigation rapide</div>
+          <div className="grid grid-cols-5 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+            {poems.map((poem, idx) => {
+              const PoemIcon = poem.icon;
+              const isRead = emotionalPath.some(p => p.index === idx);
+              return (
+                <button
+                  key={idx}
+                  onClick={() => goToPoem(idx)}
+                  className={`p-2 rounded-lg transition-all relative ${
+                    currentIndex === idx
+                      ? `bg-gradient-to-r ${poem.color} shadow-lg`
+                      : isRead
+                        ? 'bg-white/10'
+                        : 'bg-white/5'
+                  }`}
+                  title={poem.title}
+                >
+                  <PoemIcon size={16} className={currentIndex === idx ? 'animate-pulse' : ''} />
+                  {isRead && (
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-400 rounded-full"></div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Footer */}
-        <div className="mt-10 p-6 text-center text-gray-400 text-sm space-y-3 bg-black/20 rounded-xl backdrop-blur border border-purple-500/10">
-          <p className="text-base text-purple-200">
+        <div className="mt-6 md:mt-10 p-4 md:p-6 text-center text-gray-400 text-xs md:text-sm space-y-2 md:space-y-3 bg-black/20 rounded-xl backdrop-blur border border-purple-500/10">
+          <p className="text-sm md:text-base text-purple-200">
             Un recueil qui trace une trajectoire émotionnelle de l'émerveillement à la lucidité
           </p>
-          <div className="flex flex-wrap justify-center gap-4 text-xs">
+          <div className="flex flex-wrap justify-center gap-2 md:gap-4 text-[10px] md:text-xs">
             {soundEnabled && (
-              <p className="text-green-300 flex items-center gap-2">
-                🎵 Musique générative active • Chaque poème génère sa propre ambiance sonore
+              <p className="text-green-300 flex items-center gap-1 md:gap-2">
+                🎵 Musique générative active
               </p>
             )}
             {readingMode === 'semantic' && (
-              <p className="text-blue-300 flex items-center gap-2">
-                🔀 Navigation sémantique • Suivez les connexions thématiques
+              <p className="text-blue-300 flex items-center gap-1 md:gap-2">
+                🔀 Navigation sémantique
+              </p>
+            )}
+            {readingMode === 'poetic' && (
+              <p className="text-purple-300 flex items-center gap-1 md:gap-2">
+                🎙️ Mode poétique • Pause de 7s entre les poèmes
               </p>
             )}
           </div>
-          <div className="pt-3 border-t border-gray-700/50">
-            <p className="text-xs text-gray-500">
-              Recueil interactif • Technologies: React, Tone.js, Web Audio API
+          <div className="pt-2 md:pt-3 border-t border-gray-700/50">
+            <p className="text-[10px] md:text-xs text-gray-500">
+              Recueil interactif • Technologies: React, Tone.js, Framer Motion
             </p>
           </div>
         </div>
@@ -1156,7 +1312,7 @@ export default function TrajectoireInteractive() {
       {/* styles for small animations */}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
+          width: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: rgba(255, 255, 255, 0.05);
@@ -1168,6 +1324,12 @@ export default function TrajectoireInteractive() {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(168, 85, 247, 0.8);
+        }
+
+        @media (min-width: 768px) {
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+          }
         }
 
         @keyframes wave {

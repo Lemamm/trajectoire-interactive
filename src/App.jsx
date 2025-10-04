@@ -8,39 +8,50 @@ export default function App() {
   const [audioStarted, setAudioStarted] = useState(false);
 
   const startExperience = async () => {
-    await Tone.start();
-    setAudioStarted(true);
+  await Tone.start();
+  setAudioStarted(true);
 
-    const synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sine" },
-      envelope: { attack: 3, decay: 2, sustain: 0.7, release: 6 },
-    });
+  // --- Violons éthérés / nappes de cordes ---
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sawtooth" },
+    envelope: {
+      attack: 4,
+      decay: 2,
+      sustain: 0.8,
+      release: 8,
+    },
+    volume: -10,
+  });
 
-    const filter = new Tone.AutoFilter({
-      frequency: "0.1hz",
-      depth: 0.8,
-      baseFrequency: 400,
-      octaves: 3,
-    }).start();
+  const chorus = new Tone.Chorus({
+    frequency: 0.3,
+    delayTime: 4,
+    depth: 0.7,
+    spread: 180,
+  }).start();
 
-    const reverb = new Tone.Reverb({ decay: 10, wet: 0.6 }).toDestination();
-    synth.chain(filter, reverb);
+  const reverb = new Tone.Reverb({
+    decay: 12,
+    wet: 0.6,
+  }).toDestination();
 
-    const notes = ["C4", "E4", "G4", "A4", "D5", "F5"];
-    const playRandomNote = () => {
-      const note = notes[Math.floor(Math.random() * notes.length)];
-      const duration = ["1n", "2n", "4n"][Math.floor(Math.random() * 3)];
-      synth.triggerAttackRelease(note, duration, "+0.1");
-    };
+  synth.chain(chorus, reverb);
 
-    const interval = setInterval(playRandomNote, 1200);
-    setTimeout(() => {
-      clearInterval(interval);
-      synth.releaseAll();
-      reverb.wet.rampTo(0, 3);
-      setShowIntro(false);
-    }, 5000);
+  const notes = ["A3", "C4", "E4", "G4", "B4", "D5"];
+  const playNote = () => {
+    const note = notes[Math.floor(Math.random() * notes.length)];
+    synth.triggerAttackRelease(note, "4n");
   };
+
+  const interval = setInterval(playNote, 1500);
+
+  setTimeout(() => {
+    clearInterval(interval);
+    synth.releaseAll();
+    reverb.wet.rampTo(0, 4);
+    setShowIntro(false);
+  }, 6000);
+};
 
   useEffect(() => {
     return () => Tone.Transport.stop();

@@ -1105,60 +1105,6 @@ export default function TrajectoireInteractive() {
                 </div>
               </motion.div>
             )}
-{/* NOUVEAU: Section Commentaires */}
-            {showComments && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 md:mt-6 p-4 md:p-6 bg-black/40 rounded-xl backdrop-blur border border-pink-500/20"
-              >
-                <h3 className="text-base md:text-lg text-pink-300 mb-3 md:mb-4 flex items-center gap-2">
-                  <MessageCircle size={18} className="md:w-5 md:h-5" />
-                  Commentaires sur "{currentPoem.title}"
-                </h3>
-
-                {/* Liste des commentaires */}
-                <div className="space-y-2 md:space-y-3 mb-4 max-h-48 md:max-h-64 overflow-y-auto custom-scrollbar">
-                  {currentPoemComments.length === 0 ? (
-                    <p className="text-xs md:text-sm text-gray-400 italic">Aucun commentaire pour ce poème. Soyez le premier à partager votre ressenti !</p>
-                  ) : (
-                    currentPoemComments.map(comment => (
-                      <div key={comment.id} className="bg-black/30 p-3 md:p-4 rounded-lg border border-pink-500/10">
-                        <p className="text-xs md:text-sm text-gray-200">{comment.text}</p>
-                        <div className="flex justify-between items-center mt-2">
-                          <span className="text-[10px] md:text-xs text-gray-500">{comment.timestamp}</span>
-                          <button
-                            onClick={() => deleteComment(comment.id)}
-                            className="text-[10px] md:text-xs text-red-400 hover:text-red-300 transition-colors"
-                          >
-                            Supprimer
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Formulaire nouveau commentaire */}
-                <div className="flex flex-col md:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                    placeholder="Partagez votre ressenti sur ce poème..."
-                    className="flex-1 px-3 md:px-4 py-2 bg-black/50 border border-pink-500/30 rounded-lg text-white placeholder-gray-500 text-xs md:text-sm focus:outline-none focus:border-pink-500/60 transition-colors"
-                  />
-                  <button
-                    onClick={handleAddComment}
-                    disabled={!newComment.trim()}
-                    className="px-4 md:px-6 py-2 bg-pink-600/30 hover:bg-pink-600/50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-all text-xs md:text-sm font-medium border border-pink-500/20"
-                  >
-                    Publier
-                  </button>
-                </div>
-              </motion.div>
-            )}
           
             {/* If emotionalMap mode is active, render the map below the card */}
             {readingMode === "emotionalMap" && (

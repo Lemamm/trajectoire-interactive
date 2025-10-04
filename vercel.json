@@ -1,6 +1,3 @@
 {
-  "analytics": {
-    "enabled": true,
-    "mode": "anonymized"
-  }
+  "version": 2
 }

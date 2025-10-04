@@ -66,7 +66,7 @@ export default function App() {
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 1.5 }}
                 >
-                  Trajectoire Interactive
+                  Trajectoire 
                 </motion.h1>
                 <motion.button
                   onClick={startExperience}

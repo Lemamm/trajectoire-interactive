@@ -1,12 +1,21 @@
 @import "tailwindcss";
 
+/* Déclaration des variables de thème (v4 native) */
 @theme {
-  --color-background: black;
-  --color-text: white;
+  --color-bg: #0B0B14;
+  --color-text: #C9F2FF;
+
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'Inter', sans-serif;
 }
 
-body {
-  background-color: var(--color-background);
+html, body {
+  background-color: var(--color-bg);
   color: var(--color-text);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
+  transition: background 1s ease, color 1s ease;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
 }

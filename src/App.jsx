@@ -13,108 +13,114 @@ export default function App() {
   const intervalRef = useRef(null);
   const finishedRef = useRef(false);
 
-  const startExperience = async () => {
+const startExperience = async () => {
+  try {
+    // ⚠️ Nécessaire : déclenché par un clic utilisateur
+    await Tone.start();
+
+    // ✅ Patch mobile : certains navigateurs (Safari/Chrome mobile) suspendent encore le contexte
+    if (Tone.context.state !== "running") {
+      await Tone.context.resume();
+    }
+
+    setIsPlaying(true);
+
+    // --- Chaîne audio ---
+    const reverb = new Tone.Reverb({
+      decay: 10,
+      preDelay: 0.25,
+      wet: 0.6,
+    }).toDestination();
+
+    const eq = new Tone.EQ3(-4, 1, 3).connect(reverb);
+
+    // Gain master pour gérer les transitions globales
+    const masterGain = new Tone.Gain(0.75).connect(eq);
+
+    // Fade-in global doux (évite le pic au démarrage)
     try {
-      // Nécessaire : déclenché par un clic utilisateur
-      await Tone.start();
-      setIsPlaying(true);
+      const dest = Tone.getDestination();
+      dest.volume.value = -8; // commence un peu bas
+      dest.volume.rampTo(0, 1.5); // monte progressivement sur 1.5s
+    } catch (e) {
+      console.warn("Impossible d'initialiser le volume destination :", e);
+    }
 
-      // --- Chaîne audio ---
-      const reverb = new Tone.Reverb({
-        decay: 10,
-        preDelay: 0.25,
-        wet: 0.6,
-      }).toDestination();
+    // Chemin vers les sons
+    const basePath = "/sounds/";
+    const samples = {
+      A: new Tone.Player(`${basePath}violin_Amin.wav`).connect(masterGain),
+      C: new Tone.Player(`${basePath}violin_Cmaj.wav`).connect(masterGain),
+      G: new Tone.Player(`${basePath}violin_Gmaj.wav`).connect(masterGain),
+    };
 
-      const eq = new Tone.EQ3(-4, 1, 3).connect(reverb);
-
-      // Gain master pour gérer les transitions globales
-      const masterGain = new Tone.Gain(0.75).connect(eq);
-
-      // Fade-in global doux (évite le pic au démarrage)
+    // Réglages fins des Players (fade-in/out + volume réduit)
+    Object.values(samples).forEach((p) => {
       try {
-        const dest = Tone.getDestination();
-        dest.volume.value = -8; // commence un peu bas
-        dest.volume.rampTo(0, 1.5); // monte progressivement sur 1.5s
+        p.fadeIn = 0.15; // 150 ms d’entrée douce
+        p.fadeOut = 0.5; // 500 ms de sortie
+        p.volume.value = -6; // -6 dB pour réduire le pic
       } catch (e) {
-        console.warn("Impossible d'initialiser le volume destination :", e);
+        /* ignore si non supporté */
+      }
+    });
+
+    // Stockage pour cleanup
+    playersRef.current = samples;
+    playersRef.current._chain = { reverb, eq, masterGain };
+
+    // Log quand un sample est chargé
+    Object.keys(samples).forEach((k) => {
+      const p = samples[k];
+      if (typeof p.loaded !== "undefined") {
+        if (!p.loaded) p.onload = () => console.info(`Sample ${k} chargé`);
+      } else if (typeof p.on === "function") {
+        try {
+          p.on("load", () => console.info(`Sample ${k} chargé`));
+        } catch (e) {}
+      }
+    });
+
+    const chords = ["A", "C", "G"];
+    let index = 0;
+
+    const playNextChord = () => {
+      const chord = chords[index % chords.length];
+      const player = samples[chord];
+      if (!player) return;
+      try {
+        player.start();
+      } catch (err) {
+        console.warn(`Impossible de démarrer ${chord} :`, err);
+      }
+      index++;
+    };
+
+    // ▶️ Démarre immédiatement puis toutes les ~1.6s
+    playNextChord();
+    intervalRef.current = setInterval(playNextChord, 1600);
+
+    // ⏳ Après 5s : fade-out global plus doux (4s)
+    setTimeout(() => {
+      try {
+        Tone.getDestination().volume.rampTo(-25, 4); // fade-out progressif
+      } catch (err) {
+        console.warn("Impossible de faire le fade global :", err);
       }
 
-      // Chemin vers les sons
-      const basePath = "/sounds/";
-      const samples = {
-        A: new Tone.Player(`${basePath}violin_Amin.wav`).connect(masterGain),
-        C: new Tone.Player(`${basePath}violin_Cmaj.wav`).connect(masterGain),
-        G: new Tone.Player(`${basePath}violin_Gmaj.wav`).connect(masterGain),
-      };
+      clearInterval(intervalRef.current);
 
-      // Réglages fins des Players (fade-in/out + volume réduit)
-      Object.values(samples).forEach((p) => {
-        try {
-          p.fadeIn = 0.15; // 150 ms d’entrée douce
-          p.fadeOut = 0.5; // 500 ms de sortie
-          p.volume.value = -6; // -6 dB pour réduire le pic
-        } catch (e) {
-          /* ignore si non supporté */
-        }
-      });
-
-      // Stockage pour cleanup
-      playersRef.current = samples;
-      playersRef.current._chain = { reverb, eq, masterGain };
-
-      // Log quand un sample est chargé
-      Object.keys(samples).forEach((k) => {
-        const p = samples[k];
-        if (typeof p.loaded !== "undefined") {
-          if (!p.loaded) p.onload = () => console.info(`Sample ${k} chargé`);
-        } else if (typeof p.on === "function") {
-          try {
-            p.on("load", () => console.info(`Sample ${k} chargé`));
-          } catch (e) {}
-        }
-      });
-
-      const chords = ["A", "C", "G"];
-      let index = 0;
-
-      const playNextChord = () => {
-        const chord = chords[index % chords.length];
-        const player = samples[chord];
-        if (!player) return;
-        try {
-          player.start();
-        } catch (err) {
-          console.warn(`Impossible de démarrer ${chord} :`, err);
-        }
-        index++;
-      };
-
-      // ▶️ Démarre immédiatement puis toutes les ~1.6s
-      playNextChord();
-      intervalRef.current = setInterval(playNextChord, 1600);
-
-      // ⏳ Après 5s : fade-out global plus doux (4s)
+      // On attend la fin du fade pour masquer l’intro
       setTimeout(() => {
-        try {
-          Tone.getDestination().volume.rampTo(-25, 4); // fade-out progressif
-        } catch (err) {
-          console.warn("Impossible de faire le fade global :", err);
-        }
-
-        clearInterval(intervalRef.current);
-
-        // On attend la fin du fade pour masquer l’intro
-        setTimeout(() => {
-          finishedRef.current = true;
-          setShowIntro(false);
-        }, 4000);
-      }, 5000);
-    } catch (err) {
-      console.error("Erreur de démarrage audio :", err);
-      setShowIntro(false);
-    }
-  };
+        finishedRef.current = true;
+        setShowIntro(false);
+      }, 4000);
+    }, 5000);
+  } catch (err) {
+    console.error("Erreur de démarrage audio :", err);
+    setShowIntro(false);
+  }
+};
 
   // cleanup si le composant est démonté (sécurité)
   useEffect(() => {

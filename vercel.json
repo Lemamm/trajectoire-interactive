@@ -1,3 +1,9 @@
 {
-  "version": 2
+  "version": 2,
+  "framework": "vite",
+  "env": {
+    "VERCEL_ANALYTICS_MODE": "auto",
+    "VERCEL_ANALYTICS_ANONYMIZE_IP": "true",
+    "VERCEL_ANALYTICS_DISABLE_COOKIES": "true"
+  }
 }

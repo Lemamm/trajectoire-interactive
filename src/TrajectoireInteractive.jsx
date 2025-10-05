@@ -409,7 +409,7 @@ Oblige à te voir, comme faille frontale.`,
 ];
 
 const ghostPoem = {
-    title: "l'encre de mes veines",
+    title: "Poème fantôme",
     text:`Que la lune t'apaise
 Là-bas, la brume qui appelle,
 Il y a un fossé entre nous, je le traverse.
@@ -1038,7 +1038,8 @@ const current = listWithGhost[currentIndex];
                 {current ? (
                   <h2 className="text-2xl md:text-3xl font-semibold mb-4 flex items-center gap-2">
                     {current.icon && React.createElement(current.icon, { size: 22 })}
-                    {current.title}
+                    {current.title === "Poème fantôme" ? "l'encre de mes veines" : current.title}
+
                   </h2>
                 ) : (
                   <h2 className="text-2xl md:text-3xl font-semibold mb-4 text-gray-400 italic">

@@ -1,21 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Tone from "tone";
 import { motion, AnimatePresence } from "framer-motion";
-import {Play, Pause, Volume2, VolumeX, Sparkles, Shuffle, Waves, Compass, Sun, Moon, Heart, Feather, Droplets, Eye, Coffee, Settings, Wand2, Wand, Map, Scissors, Palette, Gamepad2, Clock, Lock, Unlock
+import {
+  Volume2, VolumeX, Settings, Compass, Moon, Palette, Scissors, Map, Sparkles, Wand2, Gamepad2, Clock, Lock, Unlock, Sun, Heart, Coffee, Feather, Droplets, Eye 
 } from "lucide-react";
 
-/* ---------- Helpers localStorage ---------- */
-const storage = {
-  get: (k, fallback) => {
-    try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
-  },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
-};
+/* ---------- POEMS ---------- */
 
-/* ---------- Poèmes (reprend votre contenu) ---------- */
-  // … Conserver votre tableau "poems" existant tel quel (titres, textes, icônes, color, emotion, intensity, soundscape, keywords) …
-  // Copiez votre tableau "poems" ici. Le reste du composant s'appuie dessus.
-  /* ---------- POEMS (ton contenu existant) ---------- */
 const poems = [
   {
     title: "Miroir du soir",
@@ -417,21 +408,61 @@ Oblige à te voir, comme faille frontale.`,
   }
 ];
 
-/* ---------- Constantes clés localStorage ---------- */
+const ghostPoem = {
+    title: "l'encre de mes veines",
+    text:`Que la lune t'apaise
+Là-bas, la brume qui appelle,
+Il y a un fossé entre nous, je le traverse.
+Tu es l'encre de mon stylo,
+Le sang dans mes veines,
+Tu es ma bouteille quand je n'ai plus d'eau,
+Celle dans laquelle je me baigne.
+Quand tu es là il fait si beau,
+Tu fais de l'été une saison éternelle.
+Sur mon clavier je me casse les os,
+Pour en chœur, t'écrire des poèmes.
+J'arpente les mers comme un matelot,
+Vingt berges qu'elle est belle ma bohème.
+Un an que tes yeux me tiennent idiot,
+Je t'aimerai au milieu des problèmes
+Ou allongé sur un drap de roses,
+Que l'amour nous soutienne,
+Qu'il nous porte là où l'air est nouveau.
+Que le soleil nous imprègne,
+Nous réchauffe par la peau.
+À l'abri dans des plaines
+Pour échapper à la vie, ces fardeaux.
+Je ramasserai chaque verbe à l'épuisette,
+Pour toi, comme le plus doux des cadeaux,
+Qu'ils te fassent vivre des rêves,
+Tous plus moelleux et chauds,
+J'en réciterai de mes lèvres
+Le moindre de ces tableaux.`,
+    emotion: "révélation",
+    icon: Sparkles,
+    intensity: 100
+  }
+/* ------------------- UTILITAIRES LOCALSTORAGE ------------------- */
+const storage = {
+  get: (k, fallback) => {
+    try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+  },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
 const LS_KEYS = {
-  READ_MEMORY: "traj_read_memory_v1",           // #4 timestamps par poème
-  DAILY_ASSIGN: "traj_daily_poem_v1",           // #5 mapping jour -> index
-  PALETTE: "traj_palette_v1",                   // #12 palette 5 couleurs
-  HAPTICS_ENABLED: "traj_haptics_enabled_v1",   // #13 toggle haptics
-  REMIXES: "traj_remixes_v1",                   // #9 remixes sauvegardés
-  ENTROPY_STATE: "traj_entropy_state_v1",       // #20 état des mélanges
-  PINNED_LINES: "traj_pinned_lines_v1",         // #20 lignes figées
-  WEAR_LEVEL: "traj_wear_level_v1",             // #6 patine (proxy local)
-  ECHOS: "traj_echos_v1",                       // (2) micro-réflexions locales
-  GHOST_UNLOCK: "traj_ghost_unlock_v1"          // #19 conditions locales
+  READ_MEMORY: "traj_read_memory_v1",
+  DAILY_ASSIGN: "traj_daily_poem_v1",
+  PALETTE: "traj_palette_v1",
+  HAPTICS_ENABLED: "traj_haptics_enabled_v1",
+  REMIXES: "traj_remixes_v1",
+  ENTROPY_STATE: "traj_entropy_state_v1",
+  PINNED_LINES: "traj_pinned_lines_v1",
+  WEAR_LEVEL: "traj_wear_level_v1",
+  ECHOS: "traj_echos_v1",
+  GHOST_UNLOCK: "traj_ghost_unlock_v1"
 };
 
-/* ---------- Utilitaires musique / BPM respiratoire (#3) ---------- */
+/* ------------- BREATHING TEMPO --------------- */
 const useBreathingTempo = ({ enabled, baseBpm = 80 }) => {
   const lastActionRef = useRef(Date.now());
   const [bpm, setBpm] = useState(baseBpm);
@@ -446,7 +477,6 @@ const useBreathingTempo = ({ enabled, baseBpm = 80 }) => {
 
     const id = setInterval(() => {
       const delta = Date.now() - lastActionRef.current;
-      // <1s = très actif, 1–4s = actif, >4s = pause longue
       const target = delta < 1000 ? baseBpm + 30 : delta < 4000 ? baseBpm + 10 : baseBpm - 20;
       setBpm((prev) => prev + (target - prev) * 0.15);
     }, 300);
@@ -462,25 +492,7 @@ const useBreathingTempo = ({ enabled, baseBpm = 80 }) => {
   return Math.max(40, Math.min(160, Math.round(bpm)));
 };
 
-/* ---------- Génération “Échos de lecture” (2) tombée de mots ---------- */
-const pickFallingWords = (text, limit = 8) => {
-  const words = text
-    .split(/\s+/)
-    .map(w => w.replace(/[.,;:!?—–()"'«»]/g, ""))
-    .filter(w => w.length > 2)
-    .slice(0, 120);
-  const unique = Array.from(new Set(words));
-  // échantillonner aléatoirement
-  const res = [];
-  const n = Math.min(limit, unique.length);
-  for (let i = 0; i < n; i++) {
-    const idx = Math.floor(Math.random() * unique.length);
-    res.push(unique.splice(idx, 1)[0]);
-  }
-  return res;
-};
-
-/* ---------- Entropie / mélange de texte (#20) ---------- */
+/* ------------------ SHUFFLE POUR L'ENTROPIE -------------------- */
 const shuffleWords = (text, intensity = 0.15) => {
   const lines = text.split("\n");
   return lines.map(line => {
@@ -495,89 +507,229 @@ const shuffleWords = (text, intensity = 0.15) => {
   }).join("\n");
 };
 
-/* ---------- Boussole émotionnelle 3D (#7) simplifiée (CSS transform) ---------- */
-const Compass3D = ({ poems, onPick, palette }) => {
+/* ------------- FONCTIONS POUR LES ECHOS ------------- */
+const pickFallingWords = (text, limit = 8) => {
+  if (!text) return [];
+  const words = text
+    .split(/\s+/)
+    .map(w => w.replace(/[.,;:!?—–()"'«»]/g, ""))
+    .filter(w => w.length > 2)
+    .slice(0, 120);
+  const unique = Array.from(new Set(words));
+  const res = [];
+  const n = Math.min(limit, unique.length);
+  for (let i = 0; i < n; i++) {
+    const idx = Math.floor(Math.random() * unique.length);
+    res.push(unique.splice(idx, 1)[0]);
+  }
+  return res;
+};
+
+/* ------------------ Boussole 3D --------------------- */
+const Compass3D = ({ poems, onPick, palette, currentIndex }) => {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const size = 320; 
+  const radius = size * 0.39;
   return (
-    <div className="relative w-full h-72 md:h-96 perspective-1000 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-      <div className="absolute inset-0 -rotate-12 md:-rotate-6 scale-110"
-           style={{ transformStyle: "preserve-3d" }}>
+    <div className="relative w-full flex items-center justify-center" style={{ height: size }}>
+      <div
+        className="relative"
+        style={{
+          width: size, height: size,
+          background: "radial-gradient(ellipse 70% 45% at 50% 50%,rgba(255,255,255,0.18),rgba(168,85,247,0.11) 77%, transparent 100%)",
+        }}
+      >
         {poems.map((p, i) => {
-          const angle = (i / poems.length) * Math.PI * 2;
-          const x = 40 + 40 * Math.cos(angle);
-          const y = 40 + 40 * Math.sin(angle);
+          const angle = (i / poems.length) * 2 * Math.PI;
+          const x = radius * Math.cos(angle) + size/2;
+          const y = radius * Math.sin(angle) + size/2;
+          const isActive = i === currentIndex;
+          const isHovered = i === hoveredIndex;
           return (
             <button
               key={i}
-              onClick={() => onPick(i)}
-              className="absolute px-2 py-1 text-xs md:text-sm rounded-lg shadow"
+              onClick={() => { onPick(i); setHoveredIndex(null); }}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              className={`absolute px-4 py-2 text-xs md:text-base font-medium rounded-xl shadow-lg 
+                ${isActive ? "scale-110 z-10 ring-2 ring-purple-400" : ""} ${isHovered ? "scale-105 z-10" : ""}
+                transition-transform duration-200`}
               style={{
-                left: `${x}%`, top: `${y}%`,
-                background: `linear-gradient(135deg, ${palette[0]}55, ${palette[2]}66)`,
-                color: "#fff", transform: "translate(-50%, -50%) translateZ(20px)"
+                left: x,
+                top: y,
+                transform: "translate(-50%, -50%)",
+                background: isActive
+                  ? `linear-gradient(90deg, ${palette[1]}, ${palette[3]})`
+                  : `linear-gradient(90deg, ${palette[0]}88, ${palette[2]}99)`,
+                color: "#fff",
+                border: isActive
+                  ? `2px solid ${palette[4]}`
+                  : "1px solid rgba(255,255,255,0.18)",
+                boxShadow: isActive ? "0 4px 35px #6200ea33" : "0 2px 12px 0px #0002",
+                cursor: "pointer",
+                userSelect: "none",
+                whiteSpace: "nowrap"
               }}
-              title={`${p.title} — ${p.emotion}`}
+              title={p.title}
+              aria-label={p.title}
             >
-              {p.title}
+              {p.title.length > 18 ? p.title.slice(0, 17) + "…" : p.title}
             </button>
           );
         })}
-      </div>
-      <div className="absolute bottom-2 w-full text-center text-[10px] md:text-xs text-gray-400">
-        Boussole émotionnelle — cliquez pour naviguer
+        <div style={{
+          position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)",
+          width: 22, height: 22, borderRadius: 16, background: "#9f79ff", boxShadow: "0 0 16px #fff8",
+          border: "2px solid #fff"
+        }}></div>
       </div>
     </div>
   );
 };
 
-/* ---------- Composant principal Phase 1 ---------- */
-export default function TrajectoireInteractivePhase1() {
-  // Index courant / lecture
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const current = poems[currentIndex];
+/* ---------- NOUVEAU : Composant PoemCard ---------- */
+const PoemCard = ({ poem, index, isActive, onClick, palette, reads = 0, wear = 0 }) => {
+  return (
+    <motion.button
+      onClick={onClick}
+      className={`relative w-full text-left p-4 rounded-xl overflow-hidden transition-all duration-300 ${
+        isActive ? "ring-2 ring-offset-2" : ""
+      }`}
+      style={{
+        background: isActive
+          ? `linear-gradient(135deg, ${palette[0]}88, ${palette[1]}66)`
+          : `linear-gradient(135deg, ${palette[0]}33, ${palette[2]}22)`,
+        ringColor: palette[4],
+      }}
+      whileHover={{ scale: 1.02, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
+    >
+      <motion.div
+        className="absolute top-2 right-2 px-2 py-1 rounded-full text-[10px] font-medium"
+        style={{
+          background: `${palette[3]}44`,
+          color: palette[4],
+          backdropFilter: "blur(8px)",
+        }}
+        whileHover={{ scale: 1.1 }}
+      >
+        {poem.emotion}
+      </motion.div>
 
-  // Audio
+      <div className="flex items-center gap-3 mb-2">
+        {poem.icon && (
+          <motion.div
+            className="p-2 rounded-lg"
+            style={{ background: `${palette[1]}22` }}
+            whileHover={{ rotate: 360 }}
+            transition={{ duration: 0.6 }}
+          >
+            {React.createElement(poem.icon, { size: 20, strokeWidth: 2 })}
+          </motion.div>
+        )}
+        <div className="flex-1">
+          <h3 className="font-semibold text-base">{poem.title}</h3>
+          <p className="text-xs opacity-70">
+            {poem.text.split("\n")[0].slice(0, 50)}...
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 h-1.5 rounded-full bg-white/20 overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: palette[1] }}
+          initial={{ width: 0 }}
+          animate={{ width: `${poem.intensity}%` }}
+          transition={{ duration: 0.8, delay: index * 0.05 }}
+        />
+      </div>
+
+      <div className="mt-2 flex items-center gap-3 text-[10px] opacity-60">
+        <span>📖 {reads} lectures</span>
+        <span>🎵 {poem.soundscape?.notes?.length || 0} notes</span>
+        {wear > 50 && <span>⏳ usé à {wear}%</span>}
+      </div>
+
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `linear-gradient(135deg, transparent 40%, ${palette[4]}11 50%, transparent 60%)`,
+          backgroundSize: "200% 200%",
+        }}
+        initial={{ backgroundPosition: "0% 0%" }}
+        whileHover={{ backgroundPosition: "100% 100%" }}
+        transition={{ duration: 0.8 }}
+      />
+    </motion.button>
+  );
+};
+
+/* ---------- NOUVEAU : Grille de cartes ---------- */
+const PoemCardGrid = ({ poems, currentIndex, onSelect, palette, readMemory, wearLevel }) => {
+  return (
+    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      {poems.map((poem, i) => (
+        <PoemCard
+          key={i}
+          poem={poem}
+          index={i}
+          isActive={i === currentIndex}
+          onClick={() => onSelect(i)}
+          palette={palette}
+          reads={readMemory[i]?.length || 0}
+          wear={wearLevel[i] || 0}
+        />
+      ))}
+    </div>
+  );
+};
+
+/* ---------------------- Composant principal --------------------- */
+export default function TrajectoireInteractivePhase1() {
+const [ghostUnlocked, setGhostUnlocked] = useState(storage.get(LS_KEYS.GHOST_UNLOCK, false));
+const [currentIndex, setCurrentIndex] = useState(0);
+const listWithGhost = useMemo(() => ghostUnlocked ? [...poems, ghostPoem] : poems, [ghostUnlocked]);
+const current = listWithGhost[currentIndex];
   const [soundOn, setSoundOn] = useState(false);
   const synthRef = useRef(null);
   const reverbRef = useRef(null);
   const filterRef = useRef(null);
   const loopRef = useRef(null);
   const [audioReady, setAudioReady] = useState(false);
-
-  // Modes UI
   const [modesOpen, setModesOpen] = useState(false);
-  const [showCompass, setShowCompass] = useState(false);            // #7
-  const [entropyMode, setEntropyMode] = useState(false);            // #20
-  const [showRemix, setShowRemix] = useState(false);                // #9
-  const [hapticsEnabled, setHapticsEnabled] = useState(storage.get(LS_KEYS.HAPTICS_ENABLED, true));  // #13
-  const [palette, setPalette] = useState(storage.get(LS_KEYS.PALETTE, ["#8B5CF6", "#EC4899", "#22D3EE", "#F59E0B", "#10B981"])); // #12
-  const [echoesEnabled, setEchoesEnabled] = useState(true);         // (2)
-  const [agingEnabled, setAgingEnabled] = useState(true);           // #6
-  const [nocturneAuto, setNocturneAuto] = useState(true);           // #14
-  const [ghostUnlocked, setGhostUnlocked] = useState(storage.get(LS_KEYS.GHOST_UNLOCK, false)); // #19
-
-  // Mémoire des lectures (#4)
+  const [showCompass, setShowCompass] = useState(false);
+  const [entropyMode, setEntropyMode] = useState(false);
+  const [showRemix, setShowRemix] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(storage.get(LS_KEYS.HAPTICS_ENABLED, true));
+  const [palette, setPalette] = useState(storage.get(LS_KEYS.PALETTE, ["#8B5CF6", "#EC4899", "#22D3EE", "#F59E0B", "#10B981"]));
+  const [echoesEnabled, setEchoesEnabled] = useState(true);
+  const [agingEnabled, setAgingEnabled] = useState(true);
+  const [nocturneAuto, setNocturneAuto] = useState(true);
   const [readMemory, setReadMemory] = useState(storage.get(LS_KEYS.READ_MEMORY, {}));
-  // Wear level local (#6)
   const [wearLevel, setWearLevel] = useState(storage.get(LS_KEYS.WEAR_LEVEL, poems.map(() => 0)));
-
-  // Entropie (#20)
   const [entropyState, setEntropyState] = useState(storage.get(LS_KEYS.ENTROPY_STATE, poems.map(() => 0)));
-  const [pinnedLines, setPinnedLines] = useState(storage.get(LS_KEYS.PINNED_LINES, {})); // {poemIndex: Set(lineIndex)}
-
-  // Remixes (#9)
-  const [remixes, setRemixes] = useState(storage.get(LS_KEYS.REMIXES, [])); // {id, srcIndex, dstIndex, line, date}
-
-  // Échos de lecture (2)
-  const [echoDraft, setEchoDraft] = useState(""); // 5–10 mots
-  const [echoStore, setEchoStore] = useState(storage.get(LS_KEYS.ECHOS, {})); // {word: [microText,...]}
-
-  // Poème du jour (#5)
+  const [pinnedLines, setPinnedLines] = useState(storage.get(LS_KEYS.PINNED_LINES, {}));
+  const [remixes, setRemixes] = useState(storage.get(LS_KEYS.REMIXES, []));
+  const [echoDraft, setEchoDraft] = useState("");
+  const [echoStore, setEchoStore] = useState(storage.get(LS_KEYS.ECHOS, {}));
   const [dailyIndex, setDailyIndex] = useState(null);
-
-  // Tempo respiratoire (#3)
+  const [echoesActive, setEchoesActive] = useState(false);
+  const [echoTrigger, setEchoTrigger] = useState(0);
+  const [showTitles, setShowTitles] = useState(false);
+  const [viewMode, setViewMode] = useState("list"); // NOUVEAU
   const bpm = useBreathingTempo({ enabled: soundOn, baseBpm: 80 });
 
-  /* ---------- Persistence ---------- */
+  const triggerEchoes = () => {
+    setEchoesActive(true);
+    setEchoTrigger(prev => prev + 1);
+    setTimeout(() => setEchoesActive(false), 12000);
+  };
+
+  /* ---------- PERSISTANCE ---------- */
   useEffect(() => { storage.set(LS_KEYS.HAPTICS_ENABLED, hapticsEnabled); }, [hapticsEnabled]);
   useEffect(() => { storage.set(LS_KEYS.PALETTE, palette); }, [palette]);
   useEffect(() => { storage.set(LS_KEYS.READ_MEMORY, readMemory); }, [readMemory]);
@@ -588,20 +740,12 @@ export default function TrajectoireInteractivePhase1() {
   useEffect(() => { storage.set(LS_KEYS.ECHOS, echoStore); }, [echoStore]);
   useEffect(() => { storage.set(LS_KEYS.GHOST_UNLOCK, ghostUnlocked); }, [ghostUnlocked]);
 
-  /* ---------- Audio init + lecture ---------- */
+  /* ---------- AUDIO ---------- */
   useEffect(() => {
     if (!soundOn || !audioReady) return;
-    // Stop précédent
     if (loopRef.current) { loopRef.current.stop(); loopRef.current.dispose(); loopRef.current = null; }
-
-    if (reverbRef.current) {
-      reverbRef.current.decay = (current.soundscape?.reverb || 0.5) * 5;
-      reverbRef.current.wet.value = current.soundscape?.reverb ?? 0.5;
-    }
-    if (filterRef.current) {
-      filterRef.current.frequency.rampTo(current.soundscape?.filter ?? 2000, 0.5);
-    }
-
+    if (reverbRef.current) { reverbRef.current.decay = (current.soundscape?.reverb || 0.5) * 5; reverbRef.current.wet.value = current.soundscape?.reverb ?? 0.5; }
+    if (filterRef.current) { filterRef.current.frequency.rampTo(current.soundscape?.filter ?? 2000, 0.5); }
     const notes = current.soundscape?.notes || ["C4", "E4", "G4"];
     const rhythm = current.soundscape?.rhythm || "4n";
     let i = 0;
@@ -609,7 +753,6 @@ export default function TrajectoireInteractivePhase1() {
       synthRef.current.triggerAttackRelease(notes[i % notes.length], rhythm, time);
       i++;
     }, rhythm).start(0);
-
     Tone.Transport.bpm.rampTo(bpm, 0.4);
     if (Tone.Transport.state !== "started") Tone.Transport.start();
   }, [currentIndex, soundOn, audioReady, bpm]);
@@ -642,9 +785,8 @@ export default function TrajectoireInteractivePhase1() {
     if (soundOn && audioReady) Tone.Transport.bpm.rampTo(bpm, 0.3);
   }, [bpm, soundOn, audioReady]);
 
-  /* ---------- Mémoire des lectures (#4) + Vieillissement (#6) ---------- */
+  /* ---------- MEMOIRE & VIEILLISSEMENT ---------- */
   useEffect(() => {
-    // Enregistrer lecture
     const now = new Date();
     const meta = {
       date: now.toISOString(),
@@ -655,7 +797,6 @@ export default function TrajectoireInteractivePhase1() {
       const list = prev[currentIndex] || [];
       return { ...prev, [currentIndex]: [...list, meta] };
     });
-    // Augmenter la patine locale sur ce poème
     setWearLevel(prev => {
       const clone = [...prev];
       clone[currentIndex] = Math.min(100, (clone[currentIndex] || 0) + 2);
@@ -663,13 +804,11 @@ export default function TrajectoireInteractivePhase1() {
     });
   }, [currentIndex]);
 
-  /* ---------- Poème du jour (#5) ---------- */
+  /* ---------- POEME DU JOUR ---------- */
   useEffect(() => {
     const assign = storage.get(LS_KEYS.DAILY_ASSIGN, {});
     const key = new Date().toISOString().slice(0,10);
     if (assign[key] == null) {
-      // Algorithme simple (placeholder local): phases lunaires approx. par jour julien mod 29.53
-      // + solstices/équinoxes signalés par un offset dans l’index
       const d = new Date();
       const doy = Math.floor((d - new Date(d.getFullYear(),0,0)) / 86400000);
       const seed = (doy * 37 + d.getFullYear()) % poems.length;
@@ -679,35 +818,31 @@ export default function TrajectoireInteractivePhase1() {
     setDailyIndex(assign[key]);
   }, []);
 
-  /* ---------- Mode nocturne adaptatif (#14) ---------- */
+  /* ---------- NOCTURNE ---------- */
   const isNight = useMemo(() => {
     if (!nocturneAuto) return false;
     const h = new Date().getHours();
     return h >= 22 || h < 6;
   }, [nocturneAuto]);
 
-  /* ---------- Haptique (#13) ---------- */
-  const vibrate = (pattern = [30, 60, 30]) => {
-    if (!hapticsEnabled) return;
-    if (navigator?.vibrate) {
-      navigator.vibrate(pattern);
-    }
-  };
+  /* ---------- ECHOS ---------- */
+  const fallingWords = useMemo(
+    () => (current?.text ? pickFallingWords(current.text, 8) : []),
+    [current, currentIndex, echoTrigger]
+  );
 
-  /* ---------- Échos de lecture (2) ---------- */
-  const fallingWords = useMemo(() => pickFallingWords(current.text, 8), [currentIndex]);
   const addEcho = (word, text) => {
     const micro = text.trim();
     if (micro.length < 3 || micro.length > 60) return;
     setEchoStore(prev => {
       const next = { ...prev };
-      next[word] = [...(next[word] || []), micro].slice(-6); // garder court
+      next[word] = [...(next[word] || []), micro].slice(-6);
       return next;
     });
     setEchoDraft("");
   };
 
-  /* ---------- Entropie (#20): affichage et pinning ---------- */
+  /* ---------- ENTROPIE ---------- */
   const pinLine = (poemIdx, lineIdx) => {
     setPinnedLines(prev => {
       const set = new Set(prev[poemIdx] || []);
@@ -717,15 +852,14 @@ export default function TrajectoireInteractivePhase1() {
   };
 
   const displayText = useMemo(() => {
-    if (!entropyMode) return current.text;
-    const lines = current.text.split("\n");
+    if (!entropyMode) return current?.text;
+    const lines = current?.text.split("\n");
     const pinned = new Set(pinnedLines[currentIndex] || []);
     const free = lines.map((line, idx) => (pinned.has(idx) ? line : line));
-    // appliquer un shuffle doux sur les lignes non épinglées
     const intensity = Math.min(0.35, (entropyState[currentIndex] || 0) / 100);
     const mixed = shuffleWords(free.join("\n"), intensity);
     return mixed;
-  }, [entropyMode, currentIndex, current.text, pinnedLines, entropyState]);
+  }, [entropyMode, currentIndex, current?.text, pinnedLines, entropyState]);
 
   const tickEntropy = (delta = 4) => {
     setEntropyState(prev => {
@@ -735,238 +869,119 @@ export default function TrajectoireInteractivePhase1() {
     });
   };
 
-  /* ---------- Remixer les vers (#9) ---------- */
+  /* ---------- REMIX ---------- */
   const addRemix = (srcIndex, dstIndex, line) => {
     if (!line || srcIndex == null || dstIndex == null) return;
     const entry = { id: Date.now(), srcIndex, dstIndex, line, date: new Date().toISOString() };
     setRemixes(prev => [...prev, entry]);
   };
 
-  /* ---------- Poème fantôme (#19) ---------- */
+  /* ---------- POEME FANTOME ---------- */
   useEffect(() => {
-    // Exemple de conditions locales: avoir lu 5 poèmes différents, activer entropie ≥ 20% sur au moins 1, mode nocturne actif
     const distinctRead = Object.keys(readMemory).length >= 5;
     const entropyAny = entropyState.some(v => v >= 20);
     const night = isNight;
     if (distinctRead && entropyAny && night) setGhostUnlocked(true);
   }, [readMemory, entropyState, isNight]);
 
-  const ghostPoem = useMemo(() => ({
-    title: "Poème fantôme",
-    text:
-`Je ne parais qu’aux veilleurs
-Quand l’encre pâlit sans peur,
-Aux heures où les pas se taisent
-Et que le temps dénoue sa braise.
-
-Attrape un fil de brume,
-Épingle un vers qui fume,
-Mélange mes mots qui tombent,
-Et garde ce qui succombe.`,
-    emotion: "révélation",
-    intensity: 88,
-    color: "from-gray-500 to-indigo-700",
-    soundscape: { notes: ["D4","G4","A#4","D5"], rhythm: "4n", reverb: 0.8, filter: 1400 }
-  }), []);
-
-  /* ---------- Lecture sobre: plein écran, patine visuelle (#6) ---------- */
-  const wearOpacity = agingEnabled ? Math.max(0.35, 1 - (wearLevel[currentIndex] || 0)/140) : 1;
-  const wearBlur = agingEnabled ? Math.min(2, (wearLevel[currentIndex] || 0)/70) : 0;
-
-  /* ---------- Navigation ---------- */
-  const next = () => {
-    const total = poems.length + (ghostUnlocked ? 1 : 0);
-    setCurrentIndex((i) => (i + 1) % total);
-    vibrate([20]); // micro feedback
-  };
-  const prev = () => {
-    const total = poems.length + (ghostUnlocked ? 1 : 0);
-    setCurrentIndex((i) => (i - 1 + total) % total);
-    vibrate([10,30]);
-  };
-
-  const listWithGhost = useMemo(() => ghostUnlocked ? [...poems, ghostPoem] : poems, [ghostUnlocked, ghostPoem]);
-
   /* ---------- UI ---------- */
   return (
-    <div className={`min-h-screen w-full ${isNight ? "bg-[#06080b]" : "bg-black"} text-white`}>
-      {/* Header */}
-      <div className="max-w-6xl mx-auto px-4 py-6 md:py-10">
-        <div className="flex items-center justify-between">
+    <div className={`min-h-screen w-full ${isNight ? "bg-gradient-to-br from-slate-900 to-indigo-950" : "bg-gradient-to-br from-slate-700 via-slate-100 to-cyan-200"} text-gray-900`}>
+
+      <div className="max-w-3xl mx-auto px-2 py-5 md:py-10">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl md:text-5xl font-serif tracking-wide">TRAJECTOIRE</h1>
-            <p className="text-xs md:text-sm text-gray-400">Recueil interactif — Lecture sobre par défaut</p>
+            <p className="text-xs md:text-sm text-gray-500">Recueil interactif — lecture mobile + ordinateur</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={toggleSound}
-              className={`px-3 py-2 rounded-lg border border-white/10 ${soundOn ? "bg-green-600/20" : "bg-white/5"}`}
-              title="Musique générative"
-            >
-              {soundOn ? <Volume2 size={18}/> : <VolumeX size={18}/>}
-            </button>
-            <button
-              onClick={() => setModesOpen(v => !v)}
-              className="px-3 py-2 rounded-lg border border-white/10 bg-white/5"
-              title="Modes"
-            >
-              <Settings size={18}/>
-            </button>
+            <button onClick={toggleSound} className={`px-3 py-2 rounded-lg border border-gray-300 ${soundOn ? "bg-green-600/20" : "bg-white/5"}`}>{soundOn ? <Volume2 size={18}/> : <VolumeX size={18}/>}</button>
+            <button onClick={() => setModesOpen(v => !v)} className="px-3 py-2 rounded-lg border border-gray-300 bg-white/5"><Settings size={18}/></button>
           </div>
         </div>
 
-        {/* Bandeaux contextuels */}
-        <div className="mt-3 flex flex-wrap gap-2 text-[10px] md:text-xs text-gray-300">
-          {dailyIndex !== null && (
-            <div className="px-2 py-1 rounded bg-white/5 border border-white/10" title="Poème du jour">
-              <Clock className="inline mr-1" size={12}/> Poème du jour: {poems[dailyIndex].title}
-            </div>
-          )}
+        {/* Bannière contextuelle */}
+        <div className="mt-1 flex flex-wrap gap-2 text-[11px] md:text-xs text-gray-700">
+          {dailyIndex !== null &&
+            <div className="px-2 py-1 rounded bg-white/25 border border-gray-300"><Clock className="inline mr-1" size={12}/> Poème du jour: {poems[dailyIndex].title}</div>}
           {isNight && (
-            <div className="px-2 py-1 rounded bg-white/5 border border-white/10" title="Mode nocturne adaptatif">
-              <Moon className="inline mr-1" size={12}/> Mode nocturne
-            </div>
+            <div className="px-2 py-1 rounded bg-white/25 border border-gray-300"><Moon className="inline mr-1" size={12}/> Mode nocturne</div>
           )}
-          {ghostUnlocked && (
-            <div className="px-2 py-1 rounded bg-white/5 border border-white/10" title="Poème fantôme débloqué">
-              <Sparkles className="inline mr-1" size={12}/> Poème fantôme disponible
+          {ghostUnlocked &&
+            <div className="px-2 py-1 rounded bg-white/25 border border-gray-300"><Sparkles className="inline mr-1" size={12}/> Poème fantôme débloqué</div>}
+        </div>
+
+        {/* TITRES sur téléphone */}
+        <div className="block md:hidden my-4">
+          <button onClick={() => setShowTitles(prev => !prev)} className="w-full p-3 rounded-lg bg-white/20 border border-gray-300 text-left">
+            <div className="flex items-center justify-between">
+              <span>📖 {current ? current.title : "Aucun poème"}</span>
+              <span className="text-xs">{showTitles ? "▲" : "▼"}</span>
+            </div>
+          </button>
+          {showTitles && (
+            <div className="mt-2 space-y-1 max-h-64 overflow-auto">
+              {listWithGhost.map((p, i) => {
+                const isActive = i === currentIndex;
+                const reads = readMemory[i]?.length || 0;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => { setCurrentIndex(i); setShowTitles(false); }}
+                    className={`w-full text-left p-2 rounded ${isActive ? "bg-white/40" : "bg-white/20"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm">{p.title}</div>
+                      <div className="text-xs text-gray-500">{reads}×</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Panneau Modes */}
+        {/* MODES PANEL */}
         <AnimatePresence>
           {modesOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="mt-4 p-4 rounded-xl border border-white/10 bg-black/40"
-            >
-              <div className="grid md:grid-cols-3 gap-3">
-                {/* #7 Boussole */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-sm"><Compass size={16} className="inline mr-2"/>Boussole émotionnelle</div>
-                    <button onClick={() => setShowCompass(v => !v)} className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">
-                      {showCompass ? "Masquer" : "Afficher"}
-                    </button>
-                  </div>
-                  {showCompass && (
-                    <div className="mt-2">
-                      <Compass3D poems={poems} onPick={setCurrentIndex} palette={palette}/>
-                    </div>
-                  )}
-                </div>
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="mt-4 p-4 rounded-xl border border-gray-300 bg-white/70 shadow-lg text-gray-900">
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <div className="font-medium mb-2">Navigation</div>
+                  - {showCompass &&
+-   <Compass3D poems={poems} onPick={setCurrentIndex} palette={palette} currentIndex={currentIndex}/>}
++ {showCompass &&
++   <Compass3D poems={listWithGhost} onPick={setCurrentIndex} palette={palette} currentIndex={currentIndex}/>}
 
-                {/* #20 Entropie */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-sm"><Wand2 size={16} className="inline mr-2"/>Mode entropie</div>
-                    <button onClick={() => setEntropyMode(v => !v)} className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">
-                      {entropyMode ? "Désactiver" : "Activer"}
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-300">
-                    Les mots se mélangent lentement. Épingle des vers pour les figer. Intensité: {entropyState[currentIndex] || 0}%
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button onClick={() => tickEntropy(+8)} className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">+ entropie</button>
-                    <button onClick={() => setEntropyState(s => { const a=[...s]; a[currentIndex]=Math.max(0,(a[currentIndex]||0)-8); return a; })}
-                            className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">- entropie</button>
-                  </div>
+                  {/* NOUVEAU BOUTON */}
+                  <button
+                    onClick={() => setViewMode(v => v === "list" ? "cards" : "list")}
+                    className="px-3 py-1 rounded bg-white border border-gray-300 flex items-center gap-2"
+                  >
+                    <Map size={16} />
+                    {viewMode === "list" ? "Vue cartes" : "Vue liste"}
+                  </button>
                 </div>
-
-                {/* #9 Remixer */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-sm"><Scissors size={16} className="inline mr-2"/>Remixer les vers</div>
-                    <button onClick={() => setShowRemix(v => !v)} className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">
-                      {showRemix ? "Masquer" : "Afficher"}
-                    </button>
-                  </div>
-                  {showRemix && (
-                    <div className="mt-2 text-xs">
-                      <RemixPanel poems={poems} onAdd={addRemix} remixes={remixes}/>
-                    </div>
-                  )}
-                </div>
-
-                {/* (2) Échos */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-sm"><MessageIcon/> Échos de lecture</div>
-                    <button onClick={() => setEchoesEnabled(v => !v)} className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">
-                      {echoesEnabled ? "Désactiver" : "Activer"}
-                    </button>
-                  </div>
-                  <div className="mt-2 text-[11px] text-gray-300">Clique un mot qui tombe et ajoute une micro-réflexion (5–10 mots).</div>
-                </div>
-
-                {/* #12 Palette perso */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="font-medium text-sm"><Palette size={16} className="inline mr-2"/>Palette personnelle</div>
-                  <div className="mt-2 grid grid-cols-5 gap-2">
+                <div>
+                  <div className="font-medium mb-2">Personnalisation</div>
+                  <div className="flex gap-2 mt-1">
                     {palette.map((c, i) => (
                       <input key={i} type="color" value={c}
-                             onChange={(e) => setPalette(p => { const a=[...p]; a[i]=e.target.value; return a; })}
-                             className="w-full h-8 rounded"/>
+                        onChange={e => setPalette(p => { const a = [...p]; a[i] = e.target.value; return a; })}
+                        className="w-8 h-8 border border-gray-300 rounded"
+                      />
                     ))}
                   </div>
-                </div>
-
-                {/* #13 Haptique */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-sm"><Gamepad2 size={16} className="inline mr-2"/>Vibrations haptiques</div>
-                    <button onClick={() => setHapticsEnabled(v => !v)} className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">
-                      {hapticsEnabled ? "On" : "Off"}
-                    </button>
-                  </div>
-                  <div className="mt-2 text-[11px] text-gray-300">Vibre lors des interactions avec les poèmes.</div>
-                </div>
-
-                {/* #14 Nocturne adaptatif */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-sm"><Moon size={16} className="inline mr-2"/>Mode nocturne adaptatif</div>
-                    <button onClick={() => setNocturneAuto(v => !v)} className="px-2 py-1 text-xs rounded bg-white/10 border border-white/10">
-                      {nocturneAuto ? "Auto" : "Off"}
-                    </button>
-                  </div>
-                  <div className="mt-2 text-[11px] text-gray-300">22h–6h: phosphorescent, animations ralenties, musique en sous-tonique.</div>
-                </div>
-
-                {/* #4 Mémoire des lectures */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="font-medium text-sm"><Map size={16} className="inline mr-2"/>Mémoire des lectures</div>
-                  <div className="mt-2 text-[11px] text-gray-300 max-h-32 overflow-auto">
-                    {Object.keys(readMemory).length === 0 ? (
-                      <div className="text-gray-500">Aucune lecture enregistrée.</div>
-                    ) : (
-                      Object.entries(readMemory).map(([idx, arr]) => (
-                        <div key={idx} className="mb-2">
-                          <div className="text-white/90">{poems[idx].title} — {arr.length} lecture(s)</div>
-                          <div className="text-gray-400">
-                            {arr.slice(-3).map((m,i) => (
-                              <div key={i}>• {new Date(m.date).toLocaleString("fr-FR")} — {m.season} — {m.hour}h</div>
-                            ))}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* #19 Poème fantôme — état */}
-                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="font-medium text-sm"><Sparkles size={16} className="inline mr-2"/>Poème fantôme</div>
-                  <div className="mt-1 text-xs">
-                    {ghostUnlocked ? (
-                      <span className="text-emerald-300"><Unlock size={12} className="inline mr-1"/>Débloqué</span>
-                    ) : (
-                      <span className="text-yellow-300"><Lock size={12} className="inline mr-1"/>Conditions non atteintes</span>
-                    )}
+                  <div className="flex items-center mt-2 gap-3">
+                    <span className="text-sm">Palette :</span>
+                    {palette.map((c, i) => (
+                      <span
+                        key={i}
+                        className="inline-block w-4 h-4 rounded-full"
+                        style={{ background: c }}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -974,209 +989,138 @@ Et garde ce qui succombe.`,
           )}
         </AnimatePresence>
 
-        {/* Contenu principal: Lecture sobre plein écran */}
-        <div className="mt-6 grid md:grid-cols-3 gap-6">
-          {/* Sidebar titres */}
+        {/* CONTENU PRINCIPAL : GRILLE */}
+        <div className="mt-5 grid md:grid-cols-3 gap-6">
+          {/* SIDEBAR titres desktop - MODIFIÉ POUR INCLURE LES CARTES */}
           <div className="hidden md:block">
-            <div className="space-y-2 max-h-[70vh] overflow-auto pr-2">
-              {listWithGhost.map((p, i) => {
-                const isActive = i === currentIndex;
-                const reads = readMemory[i]?.length || 0;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentIndex(i)}
-                    className={`w-full text-left p-3 rounded-lg border transition ${isActive ? "border-white/40 bg-white/10" : "border-white/10 bg-white/5 hover:bg-white/10"}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{p.title}</div>
-                      <div className="text-[10px] text-gray-400">{reads}×</div>
-                    </div>
-                    <div className="text-xs text-gray-300">{p.emotion}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Poème */}
-          <div className="md:col-span-2">
-            <div
-              className="relative rounded-2xl border border-white/10 p-6 md:p-10 min-h-[60vh] overflow-hidden"
-              style={{
-                background: `linear-gradient(135deg, ${palette[0]}22, ${palette[1]}22, ${palette[2]}22)`,
-                filter: `blur(${wearBlur}px)`,
-                opacity: wearOpacity
-              }}
-              onClick={() => vibrate([15])}
-            >
-              {/* titre + badge */}
-              <div className="relative z-10">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl md:text-4xl font-serif">{current.title}</h2>
-                  {dailyIndex === currentIndex && (
-                    <div className="px-2 py-1 rounded bg-white/10 border border-white/10 text-[10px]">Poème du jour</div>
-                  )}
-                </div>
-                <div className="text-xs md:text-sm text-gray-300 italic">{current.emotion} • Intensité {current.intensity}%</div>
+            {viewMode === "cards" ? (
+              <div className="max-h-[70vh] overflow-auto pr-2">
+                <PoemCardGrid
+                  poems={listWithGhost}
+                  currentIndex={currentIndex}
+                  onSelect={setCurrentIndex}
+                  palette={palette}
+                  readMemory={readMemory}
+                  wearLevel={wearLevel}
+                />
               </div>
-
-              {/* texte */}
-              <div className="relative z-10 mt-6 text-base md:text-xl leading-relaxed whitespace-pre-line font-serif">
-                {/* entropie avec pin des lignes */}
-                {displayText.split("\n").map((line, idx) => {
-                  const pinned = (pinnedLines[currentIndex] || []).includes(idx);
+            ) : (
+              <div className="space-y-2 max-h-[70vh] overflow-auto pr-2">
+                {listWithGhost.map((p, i) => {
+                  const isActive = i === currentIndex;
+                  const reads = readMemory[i]?.length || 0;
                   return (
-                    <div key={idx} className="group flex items-start gap-2">
-                      {entropyMode && (
-                        <button
-                          onClick={() => pinLine(currentIndex, idx)}
-                          className={`mt-1 shrink-0 w-4 h-4 rounded border ${pinned ? "bg-emerald-400/60 border-emerald-300" : "bg-white/5 border-white/20"} opacity-60 group-hover:opacity-100`}
-                          title={pinned ? "Désépingler" : "Épingler"}
-                        />
-                      )}
-                      <p className="flex-1">{line}</p>
-                    </div>
+                    <button
+                      key={i}
+                      onClick={() => setCurrentIndex(i)}
+                      className={`w-full text-left p-3 rounded-lg ${isActive ? "bg-white/40" : "bg-white/20"}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{p.title}</div>
+                        <div className="text-xs text-gray-500">{reads}×</div>
+                      </div>
+                    </button>
                   );
                 })}
               </div>
+            )}
+          </div>
 
-              {/* Échos de lecture (mots tombants) */}
-              {echoesEnabled && (
-                <div className="pointer-events-none absolute inset-0">
-                  {fallingWords.map((w, i) => {
-                    const left = `${Math.random() * 90 + 5}%`;
-                    const duration = 8 + Math.random() * 8;
-                    const delay = Math.random() * 6;
-                    return (
-                      <motion.button
-                        key={`${w}-${i}`}
-                        className="pointer-events-auto absolute text-xs md:text-sm px-2 py-1 rounded-full bg-black/50 border border-white/10"
-                        initial={{ y: -20, opacity: 0 }}
-                        animate={{ y: "110%", opacity: [0,1,1,0] }}
-                        transition={{ duration, delay, ease: "linear" }}
-                        style={{ left }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const msg = prompt("Micro-réflexion (5–10 mots max):\n“ce mot m’a fait penser à…”");
-                          if (msg) addEcho(w, msg);
+          {/* CONTENU POEME PRINCIPAL */}
+          <div className="md:col-span-2">
+            <div
+              className="relative rounded-2xl border border-gray-300 p-6 md:p-10 min-h-[60vh] overflow-hidden shadow-2xl"
+              style={{
+                background: `linear-gradient(135deg, ${palette[0]}44, ${palette[1]}66, ${palette[2]}44)`,
+                transition: "filter 0.5s ease, opacity 0.5s ease"
+              }}
+            >
+              <div className="relative z-10">
+                {current ? (
+                  <h2 className="text-2xl md:text-3xl font-semibold mb-4 flex items-center gap-2">
+                    {current.icon && React.createElement(current.icon, { size: 22 })}
+                    {current.title}
+                  </h2>
+                ) : (
+                  <h2 className="text-2xl md:text-3xl font-semibold mb-4 text-gray-400 italic">
+                    Aucun poème sélectionné
+                  </h2>
+                )}
+
+                <motion.div
+                  key={currentIndex}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.6 }}
+                  className="whitespace-pre-line font-serif text-base md:text-lg leading-relaxed"
+                >
+                  {displayText}
+                </motion.div>
+
+                {/* Actions sous le poème */}
+                <div className="mt-6 flex flex-wrap gap-3 text-sm text-gray-700">
+                  <button
+                    onClick={() => tickEntropy(5)}
+                    className="px-3 py-1 border border-gray-400 rounded-lg bg-white/20 hover:bg-white/40"
+                  >
+                    ✨ Entropie +
+                  </button>
+                  <button
+                    onClick={() => pinLine(currentIndex, 0)}
+                    className="px-3 py-1 border border-gray-400 rounded-lg bg-white/20 hover:bg-white/40"
+                  >
+                    📌 Épingler
+                  </button>
+                  <button
+                    onClick={triggerEchoes}
+                    className="px-3 py-1 border border-gray-400 rounded-lg bg-white/20 hover:bg-white/40"
+                  >
+                    💭 Échos
+                  </button>
+                </div>
+              </div>
+
+              {/* Effet visuel d'échos */}
+              <AnimatePresence>
+                {echoesActive && (
+                  <motion.div
+                    key={echoTrigger}
+                    className="absolute inset-0 pointer-events-none overflow-hidden"
+                  >
+                    {fallingWords.map((w, i) => (
+                      <motion.span
+                        key={i}
+                        initial={{
+                          opacity: 0,
+                          y: -20,
+                          x: Math.random() * window.innerWidth * 0.5,
                         }}
-                        title="Ajouter un écho"
+                        animate={{
+                          opacity: [0, 1, 0],
+                          y: ["0%", "100%"],
+                          x: Math.random() * window.innerWidth * 0.3,
+                        }}
+                        transition={{
+                          duration: 6 + Math.random() * 4,
+                          delay: Math.random() * 1.5,
+                        }}
+                        className="absolute text-white text-sm font-medium drop-shadow-lg"
                       >
                         {w}
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Liseré bas: échos existants sur mot ciblé */}
-              {echoesEnabled && (
-                <div className="relative z-10 mt-6 p-3 rounded bg-black/30 border border-white/10">
-                  <div className="text-[11px] text-gray-300">Échos récents</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {Object.entries(echoStore).slice(-8).map(([word, arr]) => (
-                      <div key={word} className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs">
-                        <span className="text-white/90">{word}:</span> <span className="text-gray-300">{arr[arr.length-1]}</span>
-                      </div>
+                      </motion.span>
                     ))}
-                    {Object.keys(echoStore).length === 0 && (
-                      <div className="text-xs text-gray-500">Aucun écho pour l’instant.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Contrôles bas */}
-              <div className="relative z-10 mt-6 flex items-center justify-between">
-                <button onClick={prev} className="px-4 py-2 rounded bg-white/10 border border-white/10">← Précédent</button>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setModesOpen(v => !v)} className="px-3 py-2 rounded bg-white/10 border border-white/10">Modes</button>
-                  <button onClick={() => setCurrentIndex(dailyIndex ?? 0)} className="px-3 py-2 rounded bg-white/10 border border-white/10">Aller au poème du jour</button>
-                </div>
-                <button onClick={next} className="px-4 py-2 rounded bg-white/10 border border-white/10">Suivant →</button>
-              </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-
-            {/* Remixes list */}
-            {showRemix && remixes.length > 0 && (
-              <div className="mt-4 p-3 rounded-xl border border-white/10 bg-black/40">
-                <div className="text-sm font-medium mb-2">Remixes récents</div>
-                <div className="space-y-2 text-xs">
-                  {remixes.slice(-8).reverse().map(r => (
-                    <div key={r.id} className="p-2 rounded bg-white/5 border border-white/10">
-                      <div className="text-white/90">“{r.line}”</div>
-                      <div className="text-gray-400">de {poems[r.srcIndex]?.title} → {poems[r.dstIndex]?.title} • {new Date(r.date).toLocaleString("fr-FR")}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
 
-        {/* Footer minimal */}
-        <div className="mt-8 text-center text-xs text-gray-400">
-          React • Tone.js • Framer Motion • localStorage — Phase 1 Standalone
+        {/* Footer */}
+        <div className="mt-8 text-center text-xs text-gray-600">
+          Version 1.0 — Trajectoire interactive © 2025  
         </div>
       </div>
     </div>
   );
-}
-
-/* ---------- Composants auxiliaires ---------- */
-function RemixPanel({ poems, remixes, onAdd }) {
-  const [src, setSrc] = useState(0);
-  const [dst, setDst] = useState(0);
-  const [lineIdx, setLineIdx] = useState(0);
-
-  const srcLines = poems[src].text.split("\n").filter(Boolean);
-
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <div>
-          <div className="text-gray-300 mb-1">Source</div>
-          <select value={src} onChange={(e)=>setSrc(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded p-1">
-            {poems.map((p,i)=> <option key={i} value={i}>{p.title}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="text-gray-300 mb-1">Destination</div>
-          <select value={dst} onChange={(e)=>setDst(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded p-1">
-            {poems.map((p,i)=> <option key={i} value={i}>{p.title}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="text-gray-300 mb-1">Ligne</div>
-          <select value={lineIdx} onChange={(e)=>setLineIdx(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded p-1">
-            {srcLines.map((l, i)=> <option key={i} value={i}>{trimLine(l)}</option>)}
-          </select>
-        </div>
-      </div>
-      <div className="flex justify-end">
-        <button
-          onClick={()=> onAdd(src, dst, srcLines[lineIdx])}
-          className="px-3 py-1 rounded bg-white/10 border border-white/10 text-xs"
-        >
-          Prélever → Glisser
-        </button>
-      </div>
-      {remixes.length > 0 && (
-        <div className="text-[10px] text-gray-400">
-          {remixes.length} remix{remixes.length>1?"s":""} enregistré{remixes.length>1?"s":""} en local
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MessageIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" className="inline mr-2"><path fill="currentColor" d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2"/></svg>;
-}
-
-function trimLine(s, n=36) {
-  const t = s.trim();
-  return t.length <= n ? t : t.slice(0,n-1)+"…";
 }

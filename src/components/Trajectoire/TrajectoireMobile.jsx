@@ -36,7 +36,7 @@ export default function TrajectoireMobile({
 
   return (
     <div className="w-full px-2 py-4">
-      
+
       {/* HEADER */}
       <div className="flex items-center justify-between mb-3">
         <div>
@@ -61,17 +61,16 @@ export default function TrajectoireMobile({
       {/* POÈME / TEXTE */}
       <div className="relative rounded-xl border border-gray-300 p-4 min-h-[50vh] overflow-auto mb-4"
         style={{ background: `linear-gradient(135deg, ${palette[0]}44, ${palette[1]}66, ${palette[2]}44)` }}>
-        
+
         {current && (
           <h2 className="text-xl font-semibold mb-3">{current.title}</h2>
         )}
 
-        {/* Effets et entropie */}
+        {/* Mode Échos */}
         <EchosMode active={false} trigger={0} palette={palette} />
-        <EntropieMode level={entropyState[currentIndex]} palette={palette} />
 
         {/* Texte interactif */}
-        <div className="whitespace-pre-line font-serif text-base leading-relaxed">
+        <div className="whitespace-pre-line font-serif text-base leading-relaxed mb-4">
           {current.text.split("\n").map((line, i) => {
             const isPinned = pinnedLines[currentIndex]?.includes(line);
             return (
@@ -97,17 +96,9 @@ export default function TrajectoireMobile({
             )
           })}
         </div>
-      </div>
 
-      {/* Contrôles Échos & Entropie & Épingler */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button
-          onClick={triggerEchoes}
-          className="flex-1 px-3 py-2 rounded-lg border bg-white/10 hover:bg-white/20 transition"
-        >
-          💭 Échos
-        </button>
-        <div className="flex-1">
+        {/* Barre d'entropie mobile-friendly sous le texte */}
+        <div className="mb-4">
           <label className="text-xs flex justify-between mb-1">
             <span>🧬 Entropie</span>
             <span>{entropyState[currentIndex] ?? 0}%</span>
@@ -126,9 +117,19 @@ export default function TrajectoireMobile({
                 return copy;
               });
             }}
-            className="w-full accent-indigo-500 cursor-pointer"
+            className="w-full h-2 accent-indigo-500 cursor-pointer rounded-lg"
           />
         </div>
+      </div>
+
+      {/* Contrôles Échos & Épingler */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <button
+          onClick={triggerEchoes}
+          className="flex-1 px-3 py-2 rounded-lg border bg-white/10 hover:bg-white/20 transition"
+        >
+          💭 Échos
+        </button>
         <button
           onClick={() => {
             if (!current?.text) return;

@@ -1,10 +1,10 @@
 // TrajectoireMobile.jsx - Version autonome
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Volume2, VolumeX, Settings, Clock, Moon, Sun, Map, List, X } from "lucide-react";
+import { motion } from "framer-motion";
 import * as Tone from "tone";
 import { poems, ghostPoem } from "./poems";
 import EchosMode from "./EchosMode";
-import EntropieMode from "./EntropieMode";
 import EpinglerMode from "./EpinglerMode";
 import PoemCardGrid from "./PoemCardGrid";
 
@@ -57,7 +57,6 @@ export default function TrajectoireMobile() {
   const [viewMode, setViewMode] = useState("list");
   const [showSettings, setShowSettings] = useState(false);
   const [showEchosMode, setShowEchosMode] = useState(false);
-  const [showEntropieMode, setShowEntropieMode] = useState(false);
   const [showEpinglerMode, setShowEpinglerMode] = useState(false);
   const [echoesActive, setEchoesActive] = useState(false);
   const [echoTrigger, setEchoTrigger] = useState(0);
@@ -86,6 +85,22 @@ export default function TrajectoireMobile() {
       setSoundOn(false);
     }
   };
+
+  useEffect(() => {
+    if (!soundOn || !audioReady || !current) return;
+    if (loopRef.current) { loopRef.current.stop(); loopRef.current.dispose(); loopRef.current = null; }
+    
+    const notes = current.soundscape?.notes || ["C4", "E4", "G4"];
+    const rhythm = current.soundscape?.rhythm || "4n";
+    let i = 0;
+    
+    loopRef.current = new Tone.Loop((time) => {
+      synthRef.current.triggerAttackRelease(notes[i % notes.length], rhythm, time);
+      i++;
+    }, rhythm).start(0);
+    
+    if (Tone.Transport.state !== "started") Tone.Transport.start();
+  }, [currentIndex, soundOn, audioReady, current]);
 
   const triggerEchoes = () => {
     setEchoesActive(true);
@@ -252,24 +267,78 @@ export default function TrajectoireMobile() {
             </h2>
           )}
 
-          <div className="whitespace-pre-line font-serif text-base leading-relaxed">
-            {current?.text}
+          {/* Animation des échos */}
+          {echoesActive && current?.text && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              {current.text.split(/\s+/).slice(0, 8).map((word, i) => (
+                <motion.span
+                  key={`${echoTrigger}-${i}`}
+                  initial={{
+                    opacity: 0,
+                    y: -20,
+                    x: Math.random() * 80 + 10,
+                  }}
+                  animate={{
+                    opacity: [0, 1, 0],
+                    y: [0, 300],
+                    x: Math.random() * 100,
+                  }}
+                  transition={{
+                    duration: 3 + Math.random() * 2,
+                    delay: Math.random() * 0.5,
+                  }}
+                  className="absolute text-white text-sm font-medium drop-shadow-lg"
+                  style={{ left: `${Math.random() * 80}%`, top: 0 }}
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </div>
+          )}
+
+          {/* Texte du poème avec effet d'entropie */}
+          <div className="whitespace-pre-line font-serif text-base leading-relaxed relative z-10">
+            {(() => {
+              if (!current?.text) return "";
+              const entropy = entropyState[currentIndex] ?? 0;
+              if (entropy === 0) return current.text;
+              
+              // Appliquer l'entropie : mélanger les mots
+              const words = current.text.split(/\s+/);
+              const shuffleAmount = Math.floor((entropy / 100) * words.length * 0.5);
+              
+              for (let i = 0; i < shuffleAmount; i++) {
+                const a = Math.floor(Math.random() * words.length);
+                const b = Math.floor(Math.random() * words.length);
+                [words[a], words[b]] = [words[b], words[a]];
+              }
+              
+              return words.join(" ");
+            })()}
           </div>
         </div>
 
         {/* CONTRÔLES */}
         <div className="flex gap-2 mb-3">
           <button
-            onClick={() => setShowEchosMode(true)}
+            onClick={triggerEchoes}
             className="flex-1 px-3 py-2 rounded-lg border bg-white/10 hover:bg-white/20 transition"
           >
             💭 Échos
           </button>
           <button
-            onClick={() => setShowEntropieMode(true)}
+            onClick={() => {
+              // Ajoute de l'entropie aléatoire entre 5 et 15%
+              const randomIncrease = Math.floor(Math.random() * 10) + 5;
+              setEntropyState(prev => {
+                const copy = [...prev];
+                copy[currentIndex] = Math.min(100, (copy[currentIndex] || 0) + randomIncrease);
+                return copy;
+              });
+            }}
             className="flex-1 px-3 py-2 rounded-lg border bg-white/10 hover:bg-white/20 transition"
           >
-            ✨ Entropie
+            ✨ Entropie +
           </button>
           <button
             onClick={() => setShowEpinglerMode(true)}
@@ -299,9 +368,13 @@ export default function TrajectoireMobile() {
                 return copy;
               });
             }}
-            className="w-full h-2 accent-indigo-500 cursor-pointer rounded-lg"
+            className="w-full h-2 rounded-lg cursor-pointer"
+            style={{
+              accentColor: palette[1],
+              background: `linear-gradient(to right, ${palette[0]} 0%, ${palette[1]} ${entropyState[currentIndex] ?? 0}%, #ddd ${entropyState[currentIndex] ?? 0}%, #ddd 100%)`
+            }}
           />
-          <div className="mt-1 h-2 rounded-full bg-gray-300 overflow-hidden">
+          <div className="mt-2 h-2 rounded-full bg-gray-300 overflow-hidden">
             <div 
               className="h-full rounded-full transition-all duration-300"
               style={{ 
@@ -398,23 +471,6 @@ export default function TrajectoireMobile() {
             currentPoem={current}
             onClose={() => setShowEchosMode(false)}
             onTriggerEchoes={triggerEchoes}
-            palette={palette}
-          />
-        )}
-        
-        {showEntropieMode && (
-          <EntropieMode
-            currentPoem={current}
-            currentIndex={currentIndex}
-            entropyState={entropyState}
-            onTickEntropy={(delta) => {
-              setEntropyState(prev => {
-                const arr = [...prev];
-                arr[currentIndex] = Math.min(100, (arr[currentIndex] || 0) + delta);
-                return arr;
-              });
-            }}
-            onClose={() => setShowEntropieMode(false)}
             palette={palette}
           />
         )}

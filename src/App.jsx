@@ -7,27 +7,6 @@ import TrajectoireMobile from "./components/Trajectoire/TrajectoireMobile";
 
 export default function App() {
   const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    // Détection initiale
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    checkMobile();
-
-    // Écouter les changements de taille d'écran
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  // Afficher la version mobile ou desktop selon la détection
-  if (isMobile) {
-    return <TrajectoireMobile />;
-  }
-
-  return <TrajectoireInteractive />;
-}
   const [showIntro, setShowIntro] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -36,6 +15,18 @@ export default function App() {
   const intervalRef = useRef(null);
   const finishedRef = useRef(false);
 
+  // ------------------- DÉTECTION MOBILE -------------------
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // ------------------- EXPÉRIENCE AUDIO INTRO -------------------
   const startExperience = async () => {
     try {
       // Nécessaire : déclenché par un clic utilisateur
@@ -74,7 +65,7 @@ export default function App() {
       // Réglages fins des Players (fade-in/out + volume réduit)
       Object.values(samples).forEach((p) => {
         try {
-          p.fadeIn = 0.15; // 150 ms d’entrée douce
+          p.fadeIn = 0.15; // 150 ms d'entrée douce
           p.fadeOut = 0.5; // 500 ms de sortie
           p.volume.value = -6; // -6 dB pour réduire le pic
         } catch (e) {
@@ -127,7 +118,7 @@ export default function App() {
 
         clearInterval(intervalRef.current);
 
-        // On attend la fin du fade pour masquer l’intro
+        // On attend la fin du fade pour masquer l'intro
         setTimeout(() => {
           finishedRef.current = true;
           setShowIntro(false);
@@ -139,7 +130,7 @@ export default function App() {
     }
   };
 
-  // cleanup si le composant est démonté (sécurité)
+  // ------------------- CLEANUP -------------------
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -156,8 +147,10 @@ export default function App() {
     };
   }, []);
 
+  // ------------------- RENDU -------------------
   return (
     <div className="min-h-screen">
+      {/* INTRO ANIMÉE */}
       <AnimatePresence>
         {showIntro && (
           <motion.div
@@ -191,11 +184,20 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {!showIntro && <TrajectoireInteractive />}
+      {/* CONTENU PRINCIPAL (mobile ou desktop) */}
+      {!showIntro && (
+        <>
+          {isMobile ? <TrajectoireMobile /> : <TrajectoireInteractive />}
+        </>
+      )}
 
-      <footer className="text-center text-gray-500 text-xs mt-8 mb-4">
-        Ce site respecte votre vie privée : aucune donnée personnelle, cookie ou
-        traceur n’est utilisé. Statistiques anonymisées via Vercel Analytics 🌿
-      </footer>
+      {/* FOOTER */}
+      {!showIntro && (
+        <footer className="text-center text-gray-500 text-xs mt-8 mb-4 px-4">
+          Ce site respecte votre vie privée : aucune donnée personnelle, cookie ou
+          traceur n'est utilisé. Statistiques anonymisées via Vercel Analytics 🌿
+        </footer>
+      )}
     </div>
   );
+}

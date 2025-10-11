@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import TrajectoireInteractive from "./components/Trajectoire/TrajectoireInteractive";
 import { motion, AnimatePresence } from "framer-motion";
+import TrajectoireMobile from "./components/Trajectoire/TrajectoireMobile";
 import * as Tone from "tone";
 
 export default function App() {

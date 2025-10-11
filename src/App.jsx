@@ -2,9 +2,33 @@
 import React, { useEffect, useRef, useState } from "react";
 import TrajectoireInteractive from "./components/Trajectoire/TrajectoireInteractive";
 import { motion, AnimatePresence } from "framer-motion";
-import TrajectoireMobile from "./components/Trajectoire/TrajectoireMobile";
 import * as Tone from "tone";
+import TrajectoireInteractive from "./components/Trajectoire/TrajectoireInteractive";
+import TrajectoireMobile from "./components/Trajectoire/TrajectoireMobile";
 
+export default function App() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Détection initiale
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+
+    // Écouter les changements de taille d'écran
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Afficher la version mobile ou desktop selon la détection
+  if (isMobile) {
+    return <TrajectoireMobile />;
+  }
+
+  return <TrajectoireInteractive />;
+}
 export default function App() {
   const [showIntro, setShowIntro] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);

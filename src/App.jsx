@@ -28,7 +28,6 @@ export default function App() {
 
   return <TrajectoireInteractive />;
 }
-export default function App() {
   const [showIntro, setShowIntro] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
 

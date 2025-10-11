@@ -1,6 +1,5 @@
 // src/App.jsx
 import React, { useEffect, useRef, useState } from "react";
-import TrajectoireInteractive from "./components/Trajectoire/TrajectoireInteractive";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Tone from "tone";
 import TrajectoireInteractive from "./components/Trajectoire/TrajectoireInteractive";
